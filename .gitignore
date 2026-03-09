@@ -82,6 +82,12 @@ venv/
 dist/
 *.pkl
 
+# Debug / test artifacts (never commit these)
+error_details*.txt
+lint_report.txt
+db_test_*.ts
+db_test_*.txt
+
 # Legacy Python projects (kept locally for reference, not part of this repo)
 project1-support-bot/
 project3-scam-mod-bot/
