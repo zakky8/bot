@@ -35,9 +35,11 @@ export interface SessionData {
   };
   logChannel?: number;
   goodbyeMessage?: string;
-  federations: Record<string, { name: string; owner: number; admins: number[]; members: number[]; banned: number[] }>;
+  federations: { current?: string } & Record<string, { name: string; owner: number; admins: number[]; members: number[]; banned: number[] }>;
   language: string;
   userData: Record<string, unknown>;
+  aiEnabled?: boolean;
+  lockMode?: LockAction;
 }
 
 export type BotContext = Context & I18nFlavor & {

@@ -1,5 +1,5 @@
 import { Bot, InlineKeyboard } from 'grammy';
-import { BotContext, LockAction } from '../../types';
+import { BotContext, LockAction, LockSetting } from '../../types';
 import { isAdminOrOwner } from '../../utils/permissions';
 
 const LOCK_ICONS: Record<string, { icon: string; label: string }> = {
@@ -135,7 +135,7 @@ export function getLockSummaryText(locks: Record<string, LockSetting>): string {
 
     Object.entries(LOCK_ICONS).forEach(([type, info]) => {
         const s = locks[type] || { mode: 'off', delete: false };
-        const modeLabel = s.mode === 'off' ? '✔️ Off' : `${ACTION_ICONS[s.mode]} ${s.mode.charAt(0).toUpperCase() + s.mode.slice(1)}`;
+        const modeLabel = s.mode === 'off' ? '✔️ Off' : `${(ACTION_ICONS as any)[s.mode]} ${s.mode.charAt(0).toUpperCase() + s.mode.slice(1)}`;
         const delLabel = s.delete ? ` + ${ACTION_ICONS.delete}` : '';
         text += `${info.icon} ${info.label} = ${modeLabel}${delLabel}\n`;
     });

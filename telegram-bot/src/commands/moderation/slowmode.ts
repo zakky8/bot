@@ -20,7 +20,7 @@ export default (bot: Bot<BotContext>) => {
             }
 
             // Set slow mode via Telegram API
-            await ctx.api.setChatSlowMode(ctx.chat.id, seconds);
+            await (ctx.api as any).setChatSlowMode(ctx.chat.id, seconds);
             
             await ctx.reply(
                 seconds > 0 

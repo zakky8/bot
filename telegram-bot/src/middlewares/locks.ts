@@ -48,7 +48,7 @@ export const locksMiddleware = async (ctx: BotContext, next: NextFunction) => {
     if (hasLink) triggerType = 'url';
     
     if (msg.text?.includes('t.me/joinchat') || msg.text?.includes('t.me/+')) triggerType = 'invitelink';
-    if (msg.forward_from || msg.forward_from_chat) triggerType = 'forward';
+    if ((msg as any).forward_from || (msg as any).forward_from_chat) triggerType = 'forward';
     if (entities.some(e => e.type === 'bot_command')) triggerType = 'command';
     if (msg.invoice || msg.successful_payment) triggerType = 'payment';
     if (msg.via_bot) triggerType = 'inline';

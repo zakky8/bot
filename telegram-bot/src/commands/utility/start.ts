@@ -10,9 +10,9 @@ export default (bot: Bot<BotContext>) => {
             const isPrivate = !ctx.chat || ctx.chat.type === 'private';
 
             if (isPrivate) {
-                const payload = ctx.match;
+                const payload = ctx.match as string;
 
-                if (payload && payload.startsWith('st_')) {
+                if (payload && typeof payload === 'string' && payload.startsWith('st_')) {
                     const chatId = payload.replace('st_', '');
                     try {
                         const { sessionRedis } = require('../../index');

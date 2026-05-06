@@ -47,7 +47,7 @@ bot.use(session({
     userData: {},
     captcha: { enabled: false, mode: 'button' },
     locks: {},
-    lockMode: 'delete',
+    lockMode: 'off',
     approvals: [],
     notes: {},
     warnings: {},
@@ -102,7 +102,7 @@ async function loadCommands() {
     if (!stat.isDirectory()) continue;
 
     const commandFiles = readdirSync(folderPath).filter(
-      (file) => file.endsWith('.ts') || file.endsWith('.js')
+      (file) => (file.endsWith('.ts') || file.endsWith('.js')) && !file.endsWith('.d.ts')
     );
 
     for (const file of commandFiles) {
@@ -128,7 +128,7 @@ async function loadHandlers() {
     return;
   }
   const handlerFiles = readdirSync(handlersPath).filter(
-    (file) => file.endsWith('.ts') || file.endsWith('.js')
+    (file) => (file.endsWith('.ts') || file.endsWith('.js')) && !file.endsWith('.d.ts')
   );
 
   for (const file of handlerFiles) {

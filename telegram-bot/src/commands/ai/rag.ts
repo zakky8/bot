@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import pdf from 'pdf-parse';
+const pdf = require('pdf-parse');
 
 // Advanced headers to mimic a real browser and bypass aggressive bot detection (like Medium)
 const SCRAPER_CONFIG = {
@@ -25,7 +25,7 @@ export default (bot: Bot<BotContext>) => {
   bot.command(['aion', 'aioff'], async (ctx: BotContext) => {
     if (!isOwner(ctx)) return denyAccess(ctx, true);
     
-    const enabled = ctx.msg.text?.includes('aion');
+    const enabled = ctx.message?.text?.includes('aion');
     // Store in session or DB (simplified here to session for now)
     ctx.session.aiEnabled = enabled;
     
@@ -36,7 +36,7 @@ export default (bot: Bot<BotContext>) => {
     if (!isOwner(ctx)) return denyAccess(ctx, true);
 
     let text = (ctx.match as string)?.trim();
-    const reply = ctx.msg.reply_to_message;
+    const reply = ctx.message?.reply_to_message;
 
     // Handle File Reply
     if (reply?.document) {
