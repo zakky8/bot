@@ -1,132 +1,48 @@
 version: '3.8'
 
 services:
-  # ── PostgreSQL Database ──────────────────────────────────────────────────────
   postgres:
     image: postgres:14-alpine
     container_name: bot-postgres
-    restart: unless-stopped
+    restart: always
     environment:
-      POSTGRES_DB: bot_system
       POSTGRES_USER: botuser
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_PASSWORD: your_postgres_password_here
+      POSTGRES_DB: botdb
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     ports:
       - "5432:5432"
-    networks:
-      - bot-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U botuser -d bot_system"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
-  # ── Redis Cache ──────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: bot-redis
-    restart: unless-stopped
-    command: redis-server --requirepass ${REDIS_PASSWORD:-}
+    restart: always
+    command: redis-server --save 60 1 --loglevel warning
     volumes:
       - redis_data:/data
     ports:
       - "6379:6379"
-    networks:
-      - bot-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
-  # ── Ollama (local AI fallback) ───────────────────────────────────────────────
-  ollama:
-    image: ollama/ollama:latest
-    container_name: bot-ollama
-    restart: unless-stopped
-    volumes:
-      - ollama_data:/root/.ollama
-    ports:
-      - "11434:11434"
-    networks:
-      - bot-network
-
-  # ── Telegram Bot ─────────────────────────────────────────────────────────────
   telegram-bot:
     build:
-      context: ./telegram-bot
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: telegram-bot/Dockerfile
     container_name: telegram-bot
-    restart: unless-stopped
+    restart: always
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - postgres
+      - redis
     environment:
-      NODE_ENV: production
-      BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      DATABASE_URL: postgresql://botuser:${POSTGRES_PASSWORD}@postgres:5432/bot_system
-      REDIS_URL: redis://:${REDIS_PASSWORD:-}@redis:6379
-      ADMIN_IDS: ${TELEGRAM_ADMIN_IDS:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
-      BOT_NAME: ${BOT_NAME:-SupportBot}
-      HUMAN_MODERATOR_CHAT_ID: ${HUMAN_MODERATOR_CHAT_ID:-}
-      OLLAMA_HOST: http://ollama:11434
-      LOG_LEVEL: ${LOG_LEVEL:-info}
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://botuser:your_postgres_password_here@postgres:5432/botdb
+      - REDIS_URL=redis://redis:6379
+      - TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+      - ANTHROPIC_API_KEY=your_anthropic_api_key_here
     volumes:
-      - ./telegram-bot/logs:/app/logs
-    networks:
-      - bot-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  # ── Discord Bot ───────────────────────────────────────────────────────────────
-  discord-bot:
-    build:
-      context: ./discord-bot
-      dockerfile: Dockerfile
-    container_name: discord-bot
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    environment:
-      NODE_ENV: production
-      BOT_TOKEN: ${DISCORD_BOT_TOKEN}
-      CLIENT_ID: ${DISCORD_CLIENT_ID}
-      DATABASE_URL: postgresql://botuser:${POSTGRES_PASSWORD}@postgres:5432/bot_system
-      REDIS_URL: redis://:${REDIS_PASSWORD:-}@redis:6379
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
-      BOT_NAME: ${BOT_NAME:-SupportBot}
-      HUMAN_MODERATOR_CHANNEL: ${HUMAN_MODERATOR_CHANNEL:-}
-      OLLAMA_HOST: http://ollama:11434
-      LOG_LEVEL: ${LOG_LEVEL:-info}
-    volumes:
-      - ./discord-bot/logs:/app/logs
-    networks:
-      - bot-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-networks:
-  bot-network:
-    driver: bridge
+      - ./telegram-bot/logs:/usr/src/app/logs
 
 volumes:
   postgres_data:
   redis_data:
-  ollama_data:

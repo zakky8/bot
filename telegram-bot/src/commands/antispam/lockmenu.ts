@@ -40,7 +40,6 @@ const ACTION_ICONS: Record<LockAction | 'delete', string> = {
 };
 
 export default (bot: Bot<BotContext>) => {
-    // ── /locktypes ──────────────────────────────────────────────────────────
     bot.command('locktypes', async (ctx) => {
         if (!(await isAdminOrOwner(ctx))) return;
 
@@ -56,7 +55,6 @@ export default (bot: Bot<BotContext>) => {
         );
     });
 
-    // ── Callback Handler ────────────────────────────────────────────────────
     bot.on('callback_query:data', async (ctx, next) => {
         const data = ctx.callbackQuery.data;
         if (!data.startsWith('lk:')) return next();

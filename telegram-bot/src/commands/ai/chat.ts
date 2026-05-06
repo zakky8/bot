@@ -75,7 +75,6 @@ export default (bot: Bot<BotContext>) => {
     }
   };
 
-  // ── Trigger Logic: Mentions and Replies ────────────────────────────────────
   bot.on('message:text', async (ctx, next) => {
     const botUser = await bot.api.getMe();
     const isMention = ctx.msg.text.includes(`@${botUser.username}`);
@@ -89,7 +88,6 @@ export default (bot: Bot<BotContext>) => {
     return next();
   });
 
-  // ── /chat & /ask — merged commands ─────────────────────────────────────────
   bot.command(['chat', 'ask'], async (ctx) => {
     const message = (ctx.match as string)?.trim();
     if (!message) {
@@ -107,7 +105,6 @@ export default (bot: Bot<BotContext>) => {
     await handleAiChat(ctx, message);
   });
 
-  // ── /support ────────────────────────────────────────────────────────────
   bot.command('support', async (ctx) => {
     const message = (ctx.match as string)?.trim();
     if (!message) {

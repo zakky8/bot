@@ -12,7 +12,6 @@ export default (bot: Bot<BotContext>) => {
             if (isPrivate) {
                 const payload = ctx.match;
 
-                // ── Handle Deep Link Connections ─────────────────────────────
                 if (payload && payload.startsWith('st_')) {
                     const chatId = payload.replace('st_', '');
                     try {
@@ -80,7 +79,6 @@ export default (bot: Bot<BotContext>) => {
                     }
                 );
             } else {
-                // ── Group behavior (Rose style) ───────────────────────────────────
                 if (!(await isAdminOrOwner(ctx))) return;
 
                 const keyboard = new InlineKeyboard()
@@ -97,7 +95,6 @@ export default (bot: Bot<BotContext>) => {
         }
     });
 
-    // ── Group Settings Prompt (Rose Style) ───────────────────────────────────
     bot.callbackQuery('group_settings_prompt', async (ctx) => {
         if (!(await isAdminOrOwner(ctx))) {
             return ctx.answerCallbackQuery({ text: 'Only admins can use this.', show_alert: true });
@@ -129,7 +126,6 @@ export default (bot: Bot<BotContext>) => {
         );
     });
 
-    // ── "Help & Commands" button → trigger help menu ─────────────────────────
     bot.callbackQuery('start_help', async (ctx) => {
         try {
             await ctx.answerCallbackQuery();
@@ -147,7 +143,6 @@ export default (bot: Bot<BotContext>) => {
         }
     });
 
-    // ── "AI Chat" button ─────────────────────────────────────────────────────
     bot.callbackQuery('start_ai', async (ctx) => {
         try {
             await ctx.answerCallbackQuery();
@@ -157,7 +152,6 @@ export default (bot: Bot<BotContext>) => {
         }
     });
 
-    // ── "Settings" button ────────────────────────────────────────────────────
     bot.callbackQuery('start_settings', async (ctx) => {
         try {
             await ctx.answerCallbackQuery();
@@ -168,7 +162,6 @@ export default (bot: Bot<BotContext>) => {
     });
 };
 
-// ── Quick help keyboard (subset for the start_help callback) ─────────────────
 function buildQuickHelpKeyboard(): InlineKeyboard {
     const kb = new InlineKeyboard();
     const buttons = [

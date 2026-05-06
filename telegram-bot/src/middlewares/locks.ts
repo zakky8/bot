@@ -21,7 +21,6 @@ export const locksMiddleware = async (ctx: BotContext, next: NextFunction) => {
 
     let triggerType: string | null = null;
 
-    // ── Detection Logic ──────────────────────────────────────────────────
 
     // 1. Basic Media
     if (msg.photo) triggerType = 'photo';
@@ -60,7 +59,6 @@ export const locksMiddleware = async (ctx: BotContext, next: NextFunction) => {
     // 3. Premium/Animated Emoji Detection
     if (entities.some(e => e.type === 'custom_emoji')) triggerType = 'premium_emoji';
 
-    // ── Enforcement Logic ────────────────────────────────────────────────
 
     if (triggerType && locks[triggerType]) {
         const setting = locks[triggerType];
@@ -79,7 +77,6 @@ export const locksMiddleware = async (ctx: BotContext, next: NextFunction) => {
         return; // Message handled
     }
 
-    // ── GLOBAL LOCK ─────────────────────────────────────────────────────
     if (locks['all'] && locks['all'].mode !== 'off') {
         const setting = locks['all'];
         if (setting.delete) { try { await ctx.deleteMessage(); } catch (e) {} }

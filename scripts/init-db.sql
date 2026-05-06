@@ -5,11 +5,10 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- Users table (unified for both platforms)
+-- Users table
 CREATE TABLE IF NOT EXISTS users (
     id BIGSERIAL PRIMARY KEY,
     telegram_id BIGINT UNIQUE,
-    discord_id BIGINT UNIQUE,
     username VARCHAR(255),
     first_name VARCHAR(255),
     last_name VARCHAR(255),
@@ -19,11 +18,10 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Guilds/Chats table
+-- Chats table
 CREATE TABLE IF NOT EXISTS guilds (
     id BIGSERIAL PRIMARY KEY,
     telegram_id BIGINT UNIQUE,
-    discord_id BIGINT UNIQUE,
     name VARCHAR(255),
     type VARCHAR(50),
     settings JSONB DEFAULT '{}',
@@ -118,64 +116,15 @@ CREATE TABLE IF NOT EXISTS federation_bans (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Levels (Discord)
-CREATE TABLE IF NOT EXISTS levels (
-    id BIGSERIAL PRIMARY KEY,
-    guild_id BIGINT REFERENCES guilds(id),
-    user_id BIGINT REFERENCES users(id),
-    xp BIGINT DEFAULT 0,
-    level INTEGER DEFAULT 0,
-    messages INTEGER DEFAULT 0,
-    last_xp_gain TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(guild_id, user_id)
-);
-
--- Level roles
-CREATE TABLE IF NOT EXISTS level_roles (
-    id BIGSERIAL PRIMARY KEY,
-    guild_id BIGINT REFERENCES guilds(id),
-    level INTEGER NOT NULL,
-    role_id BIGINT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(guild_id, level)
-);
-
--- Custom commands
-CREATE TABLE IF NOT EXISTS custom_commands (
-    id BIGSERIAL PRIMARY KEY,
-    guild_id BIGINT REFERENCES guilds(id),
-    name VARCHAR(255) NOT NULL,
-    response TEXT NOT NULL,
-    created_by BIGINT REFERENCES users(id),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(guild_id, name)
-);
-
--- Reaction roles
-CREATE TABLE IF NOT EXISTS reaction_roles (
-    id BIGSERIAL PRIMARY KEY,
-    guild_id BIGINT REFERENCES guilds(id),
-    message_id BIGINT NOT NULL,
-    channel_id BIGINT NOT NULL,
-    emoji VARCHAR(255) NOT NULL,
-    role_id BIGINT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 -- Create indexes for performance
 CREATE INDEX idx_users_telegram_id ON users(telegram_id);
-CREATE INDEX idx_users_discord_id ON users(discord_id);
 CREATE INDEX idx_guilds_telegram_id ON guilds(telegram_id);
-CREATE INDEX idx_guilds_discord_id ON guilds(discord_id);
 CREATE INDEX idx_moderation_logs_guild ON moderation_logs(guild_id);
 CREATE INDEX idx_moderation_logs_created_at ON moderation_logs(created_at DESC);
 CREATE INDEX idx_warnings_user ON warnings(user_id);
 CREATE INDEX idx_warnings_guild ON warnings(guild_id);
 CREATE INDEX idx_notes_guild ON notes(guild_id);
 CREATE INDEX idx_filters_guild ON filters(guild_id);
-CREATE INDEX idx_levels_guild_user ON levels(guild_id, user_id);
-CREATE INDEX idx_levels_xp ON levels(xp DESC);
 
 -- Create update timestamp trigger
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -200,5 +149,5 @@ GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO botuser;
 -- Success message
 DO $$
 BEGIN
-    RAISE NOTICE 'Database initialized successfully!';
+    RAISE NOTICE 'Telegram Bot Database initialized successfully!';
 END $$;

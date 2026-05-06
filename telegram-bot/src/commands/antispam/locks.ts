@@ -11,7 +11,6 @@ export const LOCK_TYPES = [
 ];
 
 export default (bot: Bot<BotContext>) => {
-  // ── /locks ──────────────────────────────────────────────────────────────
   bot.command('locks', async (ctx) => {
     if (!(await isAdminOrOwner(ctx))) return;
 
@@ -27,7 +26,6 @@ export default (bot: Bot<BotContext>) => {
     );
   });
 
-  // ── /lock ───────────────────────────────────────────────────────────────
   bot.command('lock', async (ctx) => {
     if (!(await isAdminOrOwner(ctx))) return;
 
@@ -56,7 +54,6 @@ export default (bot: Bot<BotContext>) => {
     await ctx.reply(`🔒 <b>Locked:</b> <code>${type}</code>\n└ Mode: <b>${mode}</b> | Deletion: <b>ON</b>`, { parse_mode: 'HTML' });
   });
 
-  // ── /unlock ─────────────────────────────────────────────────────────────
   bot.command('unlock', async (ctx) => {
     if (!(await isAdminOrOwner(ctx))) return;
 

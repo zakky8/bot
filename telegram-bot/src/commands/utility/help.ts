@@ -2,7 +2,6 @@ import { Bot, InlineKeyboard } from 'grammy';
 import { BotContext } from '../../types';
 import { isAdminOrOwner } from '../../utils/permissions';
 
-// ── Category details: button label → help text ───────────────────────────────
 const categories: Record<string, { emoji: string; title: string; text: string }> = {
 // ... (rest of categories remain the same)
   admin: {
@@ -95,7 +94,6 @@ const categories: Record<string, { emoji: string; title: string; text: string }>
   },
 };
 
-// ── Build the inline keyboard grid ───────────────────────────────────────────
 function buildHelpKeyboard(): InlineKeyboard {
   const kb = new InlineKeyboard();
   const keys = Object.keys(categories);
@@ -111,7 +109,6 @@ function buildHelpKeyboard(): InlineKeyboard {
   return kb;
 }
 
-// ── Main help text ───────────────────────────────────────────────────────────
 const HELP_TEXT =
   `Hey! My name is <b>Super Bot</b>. I am a group management bot, ` +
   `here to help you get around and keep the order in your groups!\n\n` +
@@ -148,7 +145,6 @@ export default (bot: Bot<BotContext>) => {
         }
     });
 
-    // ── Close button handler ─────────────────────────────────────────────────
     bot.callbackQuery('help_close', async (ctx) => {
         try {
             await ctx.deleteMessage().catch(() => {});
@@ -156,7 +152,6 @@ export default (bot: Bot<BotContext>) => {
         } catch (e) { }
     });
 
-    // ── Back button → return to main help (MUST be before regex handler) ─────
   bot.callbackQuery('help_back', async (ctx) => {
     try {
       await ctx.editMessageText(HELP_TEXT, {
@@ -170,7 +165,6 @@ export default (bot: Bot<BotContext>) => {
     }
   });
 
-  // ── Callback query handler for each category button ──────────────────────
   bot.callbackQuery(/^help_(.+)$/, async (ctx) => {
     try {
       const key = ctx.match![1];

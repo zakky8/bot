@@ -2,7 +2,6 @@ name: Code Quality
 on: [push, pull_request]
 
 jobs:
-  # ── Node.js: shared → telegram-bot → discord-bot ──────────────────────────
   node-check:
     name: TypeScript type-check (shared → telegram → discord)
     runs-on: ubuntu-latest

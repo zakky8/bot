@@ -4,7 +4,6 @@ import * as path from 'path';
 
 const BOT_ADMINS_FILE = path.join(__dirname, '..', '..', 'bot_admins.json');
 
-// ── Admin Cache ─────────────────────────────────────────────────────────────
 // Stores chat_id -> admin_user_ids[]
 const adminCache = new Map<number, { admins: number[], expires: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes

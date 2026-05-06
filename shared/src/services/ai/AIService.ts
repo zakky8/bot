@@ -7,7 +7,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { VectorStoreService } from './VectorStoreService';
 
-// ── Public Interfaces ─────────────────────────────────────────────────────────
 
 export interface AIMessage {
   role: 'system' | 'user' | 'assistant';
@@ -56,7 +55,6 @@ export interface ConversationContext {
   systemPrompt?: string;
 }
 
-// ── Internal Types ────────────────────────────────────────────────────────────
 
 interface FaqEntry {
   q: string;
@@ -82,7 +80,6 @@ interface UsageStats {
   uniqueUsers: number;
 }
 
-// ── Prompt Injection Guard ────────────────────────────────────────────────────
 
 const INJECTION_PHRASES: string[] = [
   'ignore previous instructions',
@@ -97,7 +94,6 @@ const INJECTION_PHRASES: string[] = [
 
 const MAX_INPUT_LENGTH = 1000;
 
-// ── Main Class ────────────────────────────────────────────────────────────────
 
 export class AIService {
   private anthropic?: Anthropic;
@@ -192,7 +188,6 @@ export class AIService {
     }
   }
 
-  // ── FAQ Loading ─────────────────────────────────────────────────────────────
 
   private loadFaqData(): void {
     const candidates = [
@@ -240,7 +235,6 @@ export class AIService {
   }
 
 
-  // ── System Prompt ───────────────────────────────────────────────────────────
 
   private buildSystemPrompt(override?: string): string {
     if (override) return override;
@@ -293,7 +287,6 @@ export class AIService {
     return this.cachedSystemPrompt;
   }
 
-  // ── Prompt Injection Guard ──────────────────────────────────────────────────
 
   private sanitizeInput(text: string): string {
     const truncated = text.slice(0, MAX_INPUT_LENGTH);
@@ -309,7 +302,6 @@ export class AIService {
     return truncated;
   }
 
-  // ── Rate Limiting ───────────────────────────────────────────────────────────
 
   private async checkRateLimit(userId: string): Promise<boolean> {
     const key = `ai:ratelimit:${userId}`;
@@ -327,7 +319,6 @@ export class AIService {
     return true;
   }
 
-  // ── Conversation Context ────────────────────────────────────────────────────
 
   async getConversationContext(
     userId: string,
@@ -364,7 +355,6 @@ export class AIService {
     await this.redis.del(key);
   }
 
-  // ── Anthropic Generation ────────────────────────────────────────────────────
 
   private async generateWithAnthropic(
     messages: AIMessage[],
@@ -400,7 +390,6 @@ export class AIService {
     };
   }
 
-  // ── AWS Bedrock Generation ──────────────────────────────────────────────────
 
   private async generateWithAWS(
     messages: AIMessage[],
@@ -455,7 +444,6 @@ export class AIService {
     }
   }
 
-  // ── Ollama Generation ───────────────────────────────────────────────────────
 
   private async generateWithOllama(messages: AIMessage[], model?: string): Promise<AIResponse> {
     if (!this.ollama) throw new Error('Ollama not initialised');
@@ -474,7 +462,6 @@ export class AIService {
     return { content: text, model: modelToUse, provider: 'ollama' };
   }
 
-  // ── Main chat() ─────────────────────────────────────────────────────────────
 
   async chat(
     context: ConversationContext,
@@ -616,7 +603,6 @@ export class AIService {
     return response;
   }
 
-  // ── Usage Logging ───────────────────────────────────────────────────────────
 
   private async logUsage(context: ConversationContext, response: AIResponse): Promise<void> {
     const logKey = `ai:usage:${context.platform}:${new Date().toISOString().split('T')[0]}`;
@@ -663,7 +649,6 @@ export class AIService {
     };
   }
 
-  // ── Model Management ────────────────────────────────────────────────────────
 
   async listAvailableModels(): Promise<{ anthropic: string[]; aws: string[]; ollama: string[] }> {
     const result = { anthropic: [] as string[], aws: [] as string[], ollama: [] as string[] };

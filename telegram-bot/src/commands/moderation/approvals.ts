@@ -3,7 +3,6 @@ import { BotContext } from '../../types';
 import { isAdminOrOwner } from '../../utils/permissions';
 
 export default (bot: Bot<BotContext>) => {
-  // ── /approve ────────────────────────────────────────────────────────────
   bot.command('approve', async (ctx) => {
     if (!(await isAdminOrOwner(ctx))) return;
 
@@ -24,7 +23,6 @@ export default (bot: Bot<BotContext>) => {
     await ctx.reply(`✅ <b>${target.first_name}</b> has been approved. They are now immune to locks and filters.`, { parse_mode: 'HTML' });
   });
 
-  // ── /unapprove ──────────────────────────────────────────────────────────
   bot.command('unapprove', async (ctx) => {
     if (!(await isAdminOrOwner(ctx))) return;
 
@@ -46,7 +44,6 @@ export default (bot: Bot<BotContext>) => {
     await ctx.reply(`❌ <b>${target.first_name}</b> is no longer approved.`, { parse_mode: 'HTML' });
   });
 
-  // ── /approved ───────────────────────────────────────────────────────────
   bot.command('approved', async (ctx) => {
     if (!(await isAdminOrOwner(ctx))) return;
 

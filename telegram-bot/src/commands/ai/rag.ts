@@ -22,7 +22,6 @@ const SCRAPER_CONFIG = {
 };
 
 export default (bot: Bot<BotContext>) => {
-  // ── /aion & /aioff ─────────────────────────────────────────────────────────
   bot.command(['aion', 'aioff'], async (ctx: BotContext) => {
     if (!isOwner(ctx)) return denyAccess(ctx, true);
     
@@ -33,7 +32,6 @@ export default (bot: Bot<BotContext>) => {
     return ctx.reply(`🤖 AI is now ${enabled ? '✅ ENABLED' : '❌ DISABLED'} for this chat.`);
   });
 
-  // ── /adddoc ───────────────────────────────────────────────────────────────
   bot.command('adddoc', async (ctx: BotContext) => {
     if (!isOwner(ctx)) return denyAccess(ctx, true);
 
@@ -114,7 +112,6 @@ export default (bot: Bot<BotContext>) => {
     }
   });
 
-  // ── /docstats ─────────────────────────────────────────────────────────────
   bot.command('docstats', async (ctx: BotContext) => {
     if (!isOwner(ctx)) return denyAccess(ctx, true);
     
@@ -122,7 +119,6 @@ export default (bot: Bot<BotContext>) => {
     return ctx.reply('📊 *Knowledge Base Status*\n\nIndex: `Local HNSWLib` (FAISS Equivalent)\nVectors: `Loaded`\nStatus: `Active`', { parse_mode: 'Markdown' });
   });
 
-  // ── /updatedocs ───────────────────────────────────────────────────────────
   bot.command('updatedocs', async (ctx: BotContext) => {
     if (!isOwner(ctx)) return denyAccess(ctx, true);
     
@@ -130,7 +126,6 @@ export default (bot: Bot<BotContext>) => {
     return ctx.reply('✅ All docs reloaded and reindexed.');
   });
 
-  // ── /removedoc ───────────────────────────────────────────────────────────
   bot.command('removedoc', async (ctx: BotContext) => {
     if (!isOwner(ctx)) return denyAccess(ctx, true);
     
@@ -146,7 +141,6 @@ export default (bot: Bot<BotContext>) => {
     }
   });
 
-  // ── /clearall ─────────────────────────────────────────────────────────────
   bot.command('clearall', async (ctx: BotContext) => {
     if (!isOwner(ctx)) return denyAccess(ctx, true);
     

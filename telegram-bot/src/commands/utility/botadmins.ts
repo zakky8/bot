@@ -6,7 +6,6 @@ import { createLogger } from '../../core/logger';
 const logger = createLogger('BotAdminsCommand');
 
 export default (bot: Bot<BotContext>) => {
-    // ── /addbotadmin [userId] ───────────────────────────────────────────────
     bot.command('addbotadmin', async (ctx: BotContext) => {
         try {
             if (!isOwner(ctx)) {
@@ -48,7 +47,6 @@ export default (bot: Bot<BotContext>) => {
         }
     });
 
-    // ── /delbotadmin [userId] ───────────────────────────────────────────────
     bot.command('delbotadmin', async (ctx: BotContext) => {
         try {
             if (!isOwner(ctx)) {
@@ -90,7 +88,6 @@ export default (bot: Bot<BotContext>) => {
         }
     });
 
-    // ── /botadmins ──────────────────────────────────────────────────────────
     bot.command('botadmins', async (ctx: BotContext) => {
         try {
             if (!isOwner(ctx)) {

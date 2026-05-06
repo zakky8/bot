@@ -3,7 +3,6 @@ import { BotContext } from '../../types';
 import { sessionRedis } from '../../index';
 
 export default (bot: Bot<BotContext>) => {
-    // ── /connect ──────────────────────────────────────────────────────────
     bot.command('connect', async (ctx) => {
         if (ctx.chat?.type !== 'private') {
             return ctx.reply('❌ This command can only be used in private messages with me.');
@@ -51,7 +50,6 @@ export default (bot: Bot<BotContext>) => {
         }
     });
 
-    // ── /disconnect ───────────────────────────────────────────────────────
     bot.command('disconnect', async (ctx) => {
         if (ctx.chat?.type !== 'private') return;
 
@@ -64,7 +62,6 @@ export default (bot: Bot<BotContext>) => {
         await ctx.reply('✅ **Disconnected.**\n\nYour commands will no longer be routed to the remote group.', { parse_mode: 'Markdown' });
     });
 
-    // ── /connection ───────────────────────────────────────────────────────
     bot.command('connection', async (ctx) => {
         if (ctx.chat?.type !== 'private') return;
 

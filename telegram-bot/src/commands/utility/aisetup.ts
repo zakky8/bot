@@ -40,7 +40,6 @@ export default (bot: Bot<BotContext>) => {
       const command = args[0].toLowerCase();
       const value   = args.slice(1).join(' ');
 
-      // ── AWS Commands ───────────────────────────────────────────────────────
       if (command === 'aws-key') {
         if (!value) return ctx.reply('❌ Provide AWS Access Key.');
         process.env.AWS_ACCESS_KEY = value;
@@ -62,7 +61,6 @@ export default (bot: Bot<BotContext>) => {
         return ctx.reply(`✅ AWS Region set to ${value}.`);
       }
 
-      // ── url ────────────────────────────────────────────────────────────────
       if (command === 'url') {
         if (!value) {
           // Allow clearing URL
@@ -79,7 +77,6 @@ export default (bot: Bot<BotContext>) => {
         );
       }
 
-      // ── key ────────────────────────────────────────────────────────────────
       if (command === 'key') {
         if (!value) {
           return ctx.reply('❌ Provide your API key:\n`/aisetup key gsk_...`', { parse_mode: 'Markdown' });
@@ -97,7 +94,6 @@ export default (bot: Bot<BotContext>) => {
         );
       }
 
-      // ── model ──────────────────────────────────────────────────────────────
       if (command === 'model') {
         if (!value) {
           return ctx.reply(
@@ -113,7 +109,6 @@ export default (bot: Bot<BotContext>) => {
         );
       }
 
-      // ── status ─────────────────────────────────────────────────────────────
       if (command === 'status') {
         const hasKey = !!process.env.AI_API_KEY;
         const awsKey = process.env.AWS_ACCESS_KEY || '';
@@ -134,13 +129,11 @@ export default (bot: Bot<BotContext>) => {
         );
       }
 
-      // ── faq ────────────────────────────────────────────────────────────────
       if (command === 'faq') {
         aiService.reloadFaq();
         return ctx.reply('✅ FAQ knowledge base reloaded from faq_data.json');
       }
 
-      // ── test ───────────────────────────────────────────────────────────────
       if (command === 'test') {
         const hasKey = !!process.env.AI_API_KEY;
         const hasAws = !!process.env.AWS_ACCESS_KEY && !!process.env.AWS_SECRET_KEY;
@@ -165,7 +158,6 @@ export default (bot: Bot<BotContext>) => {
         }
       }
 
-      // ── reset ──────────────────────────────────────────────────────────────
       if (command === 'reset') {
         process.env.AI_API_KEY = '';
         process.env.AI_BASE_URL = '';

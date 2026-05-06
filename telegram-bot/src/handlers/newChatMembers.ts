@@ -6,20 +6,17 @@ import { sendLog } from '../utils';
 const logger = createLogger('MemberHandler');
 
 export default (bot: Bot<BotContext>) => {
-    // ── Handle Join/Leave events via chat_member ───────────────────────────
     bot.on('chat_member', async (ctx) => {
         const oldStatus = ctx.chatMember.old_chat_member.status;
         const newStatus = ctx.chatMember.new_chat_member.status;
         const member = ctx.chatMember.new_chat_member.user;
 
-        // ── Case 1: JOIN ───────────────────────────────────────────────────
         if ((oldStatus === 'left' || oldStatus === 'kicked') && (newStatus === 'member' || newStatus === 'restricted')) {
             if (member.is_bot) return;
 
             logger.info(`User joined: ${member.first_name} (${member.id})`);
             await sendLog(ctx, `👤 <b>New Member Joined</b>\n├ User: <a href="tg://user?id=${member.id}">${member.first_name}</a>\n└ ID: <code>${member.id}</code>`);
 
-            // ── F-Ban Check (Global Federation Protection) ────────────────────
             const currentFedId = ctx.session.federations?.current;
             if (currentFedId) {
                 const { query } = require('../core/database');
@@ -95,7 +92,6 @@ export default (bot: Bot<BotContext>) => {
             }
         }
 
-        // ── Case 2: LEAVE ──────────────────────────────────────────────────
         if ((oldStatus === 'member' || oldStatus === 'restricted' || oldStatus === 'administrator') && (newStatus === 'left' || newStatus === 'kicked')) {
             if (member.is_bot) return;
 

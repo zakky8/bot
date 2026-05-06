@@ -5,7 +5,6 @@ import { isBotAdmin } from '../utils/permissions';
 export const authMiddleware = async (ctx: BotContext, next: NextFunction) => {
   // If in a private chat (DM), we must protect the AI and other private commands.
   if (ctx.chat?.type === 'private' && !isBotAdmin(ctx)) {
-    // ── Exception: Allow Help Menu in PMs (Rose Style) ──────────────────────
     
     // Check if it's a callback query for a help button
     if (ctx.callbackQuery && (ctx.callbackQuery.data?.startsWith('help_') || ctx.callbackQuery.data === 'start_help')) {

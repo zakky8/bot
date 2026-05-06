@@ -163,7 +163,6 @@ async function init() {
 
     // Start bot
     if (process.env.WEBHOOK_URL) {
-      // ── High-Performance Webhook Mode ────────────────────────────────────────
       const server = createServer(webhookCallback(bot, 'http'));
       const PORT = process.env.PORT || 3000;
       server.listen(PORT, async () => {
@@ -181,7 +180,6 @@ async function init() {
       process.once('SIGINT', stopServer);
       process.once('SIGTERM', stopServer);
     } else {
-      // ── Long Polling Mode (Local / Development) ──────────────────────────────
       // Wait to clear any lingering webhook before starting runner
       await bot.api.deleteWebhook({ drop_pending_updates: false }).catch(() => { });
 
@@ -202,7 +200,6 @@ async function init() {
       process.once('SIGTERM', stopRunner);
     }
 
-    // ── Register command menu with Telegram ──────────────────────────────────
     // Clear global and group scopes first to ensure the menu disappears from groups
     await bot.api.deleteMyCommands({ scope: { type: 'default' } }).catch(() => { });
     await bot.api.deleteMyCommands({ scope: { type: 'all_group_chats' } }).catch(() => { });
