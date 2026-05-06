@@ -50,11 +50,14 @@ export default (bot: Bot<BotContext>) => {
       let text = response.content;
       
       // FOOLPROOF HTML CLEANUP: 
-      // 1. Replace illegal angle brackets (like <https://...>) that aren't tags
-      text = text.replace(/<(?!(\/?(b|i|u|s|a|code|pre)\b))/g, '&lt;');
-      text = text.replace(/(?<!(\b(b|i|u|s|a|code|pre)))>/g, '&gt;');
+      // Replace illegal angle brackets that aren't part of valid Telegram HTML tags
+      const allowedTags = ['b', 'i', 'u', 's', 'a', 'code', 'pre'];
+      const tagPattern = new RegExp(`<(?!\\/?(${allowedTags.join('|')})\\b)[^>]*>`, 'g');
       
-      // 2. Also fix some AI's habit of using Markdown bold inside HTML mode
+      // Escape non-allowed tags
+      text = text.replace(tagPattern, (match) => match.replace('<', '&lt;').replace('>', '&gt;'));
+      
+      // Also fix some AI's habit of using Markdown bold inside HTML mode
       text = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
 
       // 3. Ensure the AI mentions the user if it didn't already
