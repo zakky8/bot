@@ -1,10 +1,5 @@
+// disconnect and connection commands are handled in connect.ts
+// This file is intentionally empty to avoid duplicate command registration.
 import { Bot } from 'grammy';
 import { BotContext } from '../../types';
-
-export default (bot: Bot<BotContext>) => {
-    bot.command('disconnect', async (ctx: BotContext) => {
-        try {
-            await ctx.reply('✅ Disconnected from remote management.');
-        } catch (error) { console.error('disconnect error:', error); await ctx.reply('❌ An error occurred.'); }
-    });
-};
+export default (_bot: Bot<BotContext>) => { /* no-op */ };

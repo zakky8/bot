@@ -1,10 +1,12 @@
 import { Bot } from 'grammy';
 import { BotContext } from '../../types';
+import { resolveGroupContext } from '../../utils/connection';
 
 export default (bot: Bot<BotContext>) => {
     bot.command('flood', async (ctx: BotContext) => {
         try {
-            if (!ctx.chat || ctx.chat.type === 'private') return ctx.reply('Groups only.');
+            const target = await resolveGroupContext(ctx);
+            if (!target) return;
 
             const flood = ctx.session.flood;
             const status = flood.limit > 0 ? '✅ Enabled' : '❌ Disabled';

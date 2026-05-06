@@ -1,12 +1,15 @@
 import { Bot } from 'grammy';
 import { BotContext } from '../../types';
+import { resolveGroupContext } from '../../utils/connection';
 
 export default (bot: Bot<BotContext>) => {
     bot.command('antiraid', async (ctx: BotContext) => {
         try {
-            if (!ctx.chat || ctx.chat.type === 'private') return ctx.reply('Groups only.');
-            const admins = await ctx.getChatAdministrators();
-            if (!admins.some(a => a.user.id === ctx.from?.id)) return ctx.reply('❌ <b>Access Denied:</b> You need administrative privileges to use this command.', { parse_mode: 'HTML' }).then(msg => { setTimeout(() => { ctx.deleteMessage().catch(()=>{}); ctx.api.deleteMessage(ctx.chat!.id, msg.message_id).catch(()=>{}); }, 5000); });
+            const target = await resolveGroupContext(ctx);
+            if (!target) return;
+            const targetChatId = target.chatId;
+            const admins = await ctx.api.getChatAdministrators(targetChatId);
+            if (!admins.some(a => a.user.id === ctx.from?.id)) return ctx.reply('❌ <b>Access Denied:</b> You need administrative privileges to use this command.', { parse_mode: 'HTML' }).then(msg => { setTimeout(() => { ctx.deleteMessage().catch(()=>{}); ctx.api.deleteMessage(targetChatId, msg.message_id).catch(()=>{}); }, 5000); });
 
             const arg = ctx.message?.text?.split(' ')[1]?.toLowerCase();
 
@@ -22,8 +25,8 @@ export default (bot: Bot<BotContext>) => {
                 for (const user of tracked) {
                     try {
                         // Kick (unban immediately to avoid permanent ban)
-                        await ctx.banChatMember(user.id);
-                        await ctx.unbanChatMember(user.id);
+                        await ctx.api.banChatMember(targetChatId, user.id);
+                        await ctx.api.unbanChatMember(targetChatId, user.id);
                         kicked++;
                     } catch (e) { /* user may have already left */ }
                 }
@@ -59,9 +62,11 @@ export default (bot: Bot<BotContext>) => {
     // /clearraid — Clear the tracked recent joins list
     bot.command('clearraid', async (ctx: BotContext) => {
         try {
-            if (!ctx.chat || ctx.chat.type === 'private') return ctx.reply('Groups only.');
-            const admins = await ctx.getChatAdministrators();
-            if (!admins.some(a => a.user.id === ctx.from?.id)) return ctx.reply('❌ <b>Access Denied:</b> You need administrative privileges to use this command.', { parse_mode: 'HTML' }).then(msg => { setTimeout(() => { ctx.deleteMessage().catch(()=>{}); ctx.api.deleteMessage(ctx.chat!.id, msg.message_id).catch(()=>{}); }, 5000); });
+            const target = await resolveGroupContext(ctx);
+            if (!target) return;
+            const targetChatId = target.chatId;
+            const admins = await ctx.api.getChatAdministrators(targetChatId);
+            if (!admins.some(a => a.user.id === ctx.from?.id)) return ctx.reply('❌ <b>Access Denied:</b> You need administrative privileges to use this command.', { parse_mode: 'HTML' }).then(msg => { setTimeout(() => { ctx.deleteMessage().catch(()=>{}); ctx.api.deleteMessage(targetChatId, msg.message_id).catch(()=>{}); }, 5000); });
 
             if (!ctx.session.antiraid) ctx.session.antiraid = { enabled: false, recentJoins: [] };
             const count = (ctx.session.antiraid.recentJoins || []).length;

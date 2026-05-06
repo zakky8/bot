@@ -1,10 +1,12 @@
 import { Bot } from 'grammy';
 import { BotContext } from '../../types';
+import { resolveGroupContext } from '../../utils/connection';
 
 export default (bot: Bot<BotContext>) => {
     bot.command('welcome', async (ctx: BotContext) => {
         try {
-            if (!ctx.chat || ctx.chat.type === 'private') return ctx.reply('Groups only.');
+            const target = await resolveGroupContext(ctx);
+            if (!target) return;
             const msg = ctx.session.welcomeMessage;
             const captcha = ctx.session.captcha?.enabled ? '✅ On' : '❌ Off';
             await ctx.reply(

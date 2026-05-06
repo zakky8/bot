@@ -1,10 +1,12 @@
 import { Bot } from 'grammy';
 import { BotContext } from '../../types';
+import { resolveGroupContext } from '../../utils/connection';
 
 export default (bot: Bot<BotContext>) => {
     bot.command('blacklist', async (ctx: BotContext) => {
         try {
-            if (!ctx.chat || ctx.chat.type === 'private') return ctx.reply('Groups only.');
+            const target = await resolveGroupContext(ctx);
+            if (!target) return;
             const bl = ctx.session.blacklist || [];
             const mode = ctx.session.blacklistMode || 'delete';
             if (bl.length === 0) return ctx.reply('📝 <b>Blacklisted Words</b>\n\nNo words currently blacklisted.\n\nUse /addblacklist to add words.\nUse /unblacklist to remove words.\nUse /blacklistmode to set action.', { parse_mode: 'HTML' });

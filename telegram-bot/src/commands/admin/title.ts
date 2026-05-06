@@ -4,7 +4,7 @@ import { BotContext } from '../../types';
 export default (bot: Bot<BotContext>) => {
     bot.command('title', async (ctx: BotContext) => {
         try {
-            if (!ctx.chat || ctx.chat.type === 'private') return ctx.reply('Groups only.');
+            if (!ctx.chat || ctx.chat.type === 'private') return ctx.reply('❌ This command can only be used in groups. Use /connect to link a group first.');
             const admins = await ctx.getChatAdministrators();
             if (!admins.some(a => a.user.id === ctx.from?.id && a.status === 'creator')) return ctx.reply('❌ <b>Access Denied:</b> Only the group owner can use this command.', { parse_mode: 'HTML' }).then(msg => { setTimeout(() => { ctx.deleteMessage().catch(()=>{}); ctx.api.deleteMessage(ctx.chat!.id, msg.message_id).catch(()=>{}); }, 5000); });
             const reply = ctx.message?.reply_to_message;
