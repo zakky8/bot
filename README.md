@@ -41,6 +41,20 @@ A production-grade Telegram bot system built with TypeScript, featuring advanced
    npm run start:telegram
    ```
 
+## Deployment (Google Cloud VM)
+
+1. **Provision VM**: Create an Ubuntu 22.04 VM on Google Compute Engine.
+2. **Setup**: Run the setup script provided in the repository:
+   ```bash
+   chmod +x scripts/setup-vm.sh
+   ./scripts/setup-vm.sh
+   ```
+3. **Configure**: Create a `.env` file in the root directory (refer to `.env.example`).
+4. **Launch**:
+   ```bash
+   docker-compose up -d
+   ```
+
 ## Development
 
 - `npm run dev:telegram`: Run the bot in development mode with hot-reload.
