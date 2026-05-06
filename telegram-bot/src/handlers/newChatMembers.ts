@@ -5,98 +5,219 @@ import { sendLog } from '../utils';
 
 const logger = createLogger('MemberHandler');
 
+// ── Captcha timeout tracker ──────────────────────────────────────────────────
+// key: `${chatId}:${userId}` → { timeout, msgId }
+const pendingCaptchas = new Map<string, { timeout: NodeJS.Timeout; msgId?: number }>();
+
+function captchaKey(chatId: number, userId: number) {
+    return `${chatId}:${userId}`;
+}
+
+function cancelPendingCaptcha(chatId: number, userId: number) {
+    const key = captchaKey(chatId, userId);
+    const pending = pendingCaptchas.get(key);
+    if (pending) {
+        clearTimeout(pending.timeout);
+        pendingCaptchas.delete(key);
+    }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Send and optionally auto-delete a welcome message, respecting cleanWelcome. */
+async function sendWelcome(ctx: BotContext, chatId: number, member: { id: number; first_name: string }) {
+    const welcomeMsg = ctx.session.welcomeMessage;
+    if (!welcomeMsg) return;
+
+    // Delete previous welcome message if cleanWelcome is on
+    if (ctx.session.cleanWelcome && ctx.session.lastWelcomeMsgId) {
+        await ctx.api.deleteMessage(chatId, ctx.session.lastWelcomeMsgId).catch(() => {});
+        ctx.session.lastWelcomeMsgId = undefined;
+    }
+
+    let count = '?';
+    try { count = String(await ctx.api.getChatMemberCount(chatId)); } catch { /* ignore */ }
+
+    const text = welcomeMsg
+        .replace(/\{user\}/g, `<a href="tg://user?id=${member.id}">${member.first_name}</a>`)
+        .replace(/\{chatname\}/g, ctx.chat?.title || 'Group')
+        .replace(/\{count\}/g, count)
+        .replace(/\{first\}/g, member.first_name)
+        .replace(/\{id\}/g, String(member.id));
+
+    const sent = await ctx.api.sendMessage(chatId, text, { parse_mode: 'HTML' }).catch(() => null);
+    if (sent && ctx.session.cleanWelcome) {
+        ctx.session.lastWelcomeMsgId = sent.message_id;
+    }
+}
+
 export default (bot: Bot<BotContext>) => {
+
+    // ── Delete Telegram service "X joined / X left" messages ─────────────────
+    // These are separate from chat_member updates — they're plain message updates
+    // with new_chat_members / left_chat_member fields.
+    bot.on('message:new_chat_members', async (ctx) => {
+        if (ctx.session.cleanService) {
+            await ctx.deleteMessage().catch(() => {});
+        }
+    });
+
+    bot.on('message:left_chat_member', async (ctx) => {
+        if (ctx.session.cleanService) {
+            await ctx.deleteMessage().catch(() => {});
+        }
+    });
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // ── Main join/leave handler ───────────────────────────────────────────────
     bot.on('chat_member', async (ctx) => {
         const oldStatus = ctx.chatMember.old_chat_member.status;
         const newStatus = ctx.chatMember.new_chat_member.status;
-        const member = ctx.chatMember.new_chat_member.user;
+        const member    = ctx.chatMember.new_chat_member.user;
+        const chatId    = ctx.chat.id;
 
-        if ((oldStatus === 'left' || oldStatus === 'kicked') && (newStatus === 'member' || newStatus === 'restricted')) {
-            if (member.is_bot) return;
+        // ── USER JOINED ───────────────────────────────────────────────────────
+        const isJoin = (oldStatus === 'left' || oldStatus === 'kicked') &&
+                       (newStatus === 'member' || newStatus === 'restricted');
 
-            logger.info(`User joined: ${member.first_name} (${member.id})`);
-            await sendLog(ctx, `👤 <b>New Member Joined</b>\n├ User: <a href="tg://user?id=${member.id}">${member.first_name}</a>\n└ ID: <code>${member.id}</code>`);
+        if (isJoin && !member.is_bot) {
+            logger.info(`User joined: ${member.first_name} (${member.id}) in chat ${chatId}`);
 
+            // Cancel any stale captcha from a previous join (user left and rejoined)
+            cancelPendingCaptcha(chatId, member.id);
+
+            await sendLog(ctx,
+                `👤 <b>New Member Joined</b>\n` +
+                `├ User: <a href="tg://user?id=${member.id}">${member.first_name}</a>\n` +
+                `└ ID: <code>${member.id}</code>`
+            );
+
+            // ── Federation ban check ──────────────────────────────────────────
             const currentFedId = ctx.session.federations?.current;
             if (currentFedId) {
-                const { query } = require('../core/database');
                 try {
+                    const { query } = require('../core/database');
                     const fban = await query(
                         'SELECT reason FROM federation_bans WHERE federation_id = $1 AND user_id = $2',
                         [currentFedId, member.id]
                     );
-                    if (fban.rowCount > 0) {
-                        await ctx.banChatMember(member.id);
-                        await ctx.reply(`🚫 <b>F-Banned User Detected</b>\n\nThis user is globally banned in this federation.\n└ <b>Reason:</b> ${fban.rows[0].reason}`, { parse_mode: 'HTML' });
-                        await sendLog(ctx, `🛡️ <b>FBan Enforcement</b>\n├ User: ${member.first_name}\n└ Status: Banned (Found in Federation DB)`);
-                        return; // Stop processing further
+                    if ((fban.rowCount ?? 0) > 0) {
+                        await ctx.api.banChatMember(chatId, member.id);
+                        await ctx.api.sendMessage(chatId,
+                            `🚫 <b>F-Banned User Detected</b>\n\nThis user is globally banned in this federation.\n└ <b>Reason:</b> ${fban.rows[0].reason}`,
+                            { parse_mode: 'HTML' }
+                        );
+                        await sendLog(ctx,
+                            `🛡️ <b>FBan Enforcement</b>\n├ User: ${member.first_name}\n└ Status: Banned (Federation DB)`
+                        );
+                        return;
                     }
                 } catch (e) { logger.error('FBan check error:', e); }
             }
 
-            // Anti-Raid tracking
+            // ── Anti-Raid check ───────────────────────────────────────────────
             if (!ctx.session.antiraid) ctx.session.antiraid = { enabled: false, recentJoins: [] };
             const raid = ctx.session.antiraid;
 
             if (raid.enabled) {
                 try {
-                    await ctx.banChatMember(member.id);
-                    await ctx.unbanChatMember(member.id);
-                    await sendLog(ctx, `🛡️ <b>Anti-Raid Action</b>\n├ User: ${member.first_name}\n└ Status: Kicked (Raid Mode Active)`);
-                } catch (e) {}
+                    await ctx.api.banChatMember(chatId, member.id);
+                    await ctx.api.unbanChatMember(chatId, member.id);
+                    await sendLog(ctx,
+                        `🛡️ <b>Anti-Raid Action</b>\n├ User: ${member.first_name}\n└ Status: Kicked (Raid Mode Active)`
+                    );
+                } catch (e) { logger.warn('Anti-raid kick failed:', e); }
                 return;
             }
 
+            // Track recent joins (for raid detection)
             raid.recentJoins.push({ id: member.id, joinedAt: Date.now() });
-            const dayAgo = Date.now() - 86400000;
+            const dayAgo = Date.now() - 86_400_000;
             raid.recentJoins = raid.recentJoins.filter(j => j.joinedAt > dayAgo);
 
-            // CAPTCHA or Welcome
+            // ── Captcha ───────────────────────────────────────────────────────
             if (ctx.session.captcha?.enabled) {
+                // Restrict the user immediately — they cannot speak until verified
                 try {
-                    await ctx.restrictChatMember(member.id, { can_send_messages: false });
-                    const mode = ctx.session.captcha.mode || 'button';
-                    let question = 'Please verify you are human.';
-                    let keyboard = new InlineKeyboard();
-
-                    if (mode === 'math') {
-                        const a = Math.floor(Math.random() * 9) + 1;
-                        const b = Math.floor(Math.random() * 9) + 1;
-                        const sum = a + b;
-                        question = `🔢 <b>Math Quiz</b>\n\nWhat is <code>${a} + ${b}</code>?`;
-                        const answers = [sum, sum + 1, sum - 1, sum + 2].sort(() => Math.random() - 0.5);
-                        answers.forEach(ans => {
-                            keyboard.text(String(ans), `captcha_verify_${member.id}_${ans === sum ? 'correct' : 'wrong'}`);
-                        });
-                    } else {
-                        keyboard.text('✅ I am human', `captcha_verify_${member.id}_correct`);
-                    }
-
-                    await ctx.reply(`Welcome <a href="tg://user?id=${member.id}">${member.first_name}</a>!\n\n${question}`, {
-                        parse_mode: 'HTML',
-                        reply_markup: keyboard,
-                    });
-                } catch (e) {}
-            } else {
-                const welcomeMsg = ctx.session.welcomeMessage;
-                if (welcomeMsg) {
-                    let count = '?'; try { count = String(await ctx.getChatMemberCount()); } catch (e) {}
-                    const text = welcomeMsg
-                        .replace(/\{user\}/g, `<a href="tg://user?id=${member.id}">${member.first_name}</a>`)
-                        .replace(/\{chatname\}/g, ctx.chat?.title || 'Group')
-                        .replace(/\{count\}/g, count)
-                        .replace(/\{first\}/g, member.first_name)
-                        .replace(/\{id\}/g, String(member.id));
-                    await ctx.reply(text, { parse_mode: 'HTML' });
+                    await ctx.api.restrictChatMember(chatId, member.id, { can_send_messages: false });
+                } catch (e) {
+                    logger.error(`Failed to restrict user ${member.id} for captcha:`, e);
+                    // Can't restrict — send welcome anyway (bot may lack permission)
+                    await sendWelcome(ctx, chatId, member);
+                    return;
                 }
+
+                const mode = ctx.session.captcha.mode || 'button';
+                let question = 'Please verify you are human to join the chat.';
+                let keyboard = new InlineKeyboard();
+
+                if (mode === 'math') {
+                    const a = Math.floor(Math.random() * 9) + 1;
+                    const b = Math.floor(Math.random() * 9) + 1;
+                    const sum = a + b;
+                    question = `🔢 <b>Quick math check</b>\n\nWhat is <code>${a} + ${b}</code>?`;
+                    // Build 4 answer buttons in random order, only one correct
+                    const distractors = new Set<number>();
+                    distractors.add(sum);
+                    while (distractors.size < 4) {
+                        distractors.add(sum + Math.floor(Math.random() * 5) - 2);
+                    }
+                    [...distractors].sort(() => Math.random() - 0.5).forEach(ans => {
+                        keyboard.text(String(ans), `captcha_verify_${member.id}_${ans === sum ? 'correct' : 'wrong'}`);
+                    });
+                } else {
+                    keyboard.text('✅ I am not a bot', `captcha_verify_${member.id}_correct`);
+                }
+
+                const captchaText = ctx.session.captcha.text
+                    || `👋 Welcome, <a href="tg://user?id=${member.id}">${member.first_name}</a>!\n\n${question}`;
+
+                const sent = await ctx.api.sendMessage(chatId, captchaText, {
+                    parse_mode: 'HTML',
+                    reply_markup: keyboard,
+                }).catch((e) => { logger.error('Failed to send captcha message:', e); return null; });
+
+                // ── Captcha timeout / auto-kick ───────────────────────────────
+                const kickMinutes = ctx.session.captcha.kickTime ?? 5; // default 5 min
+                const msgId = sent?.message_id;
+
+                const timeout = setTimeout(async () => {
+                    pendingCaptchas.delete(captchaKey(chatId, member.id));
+                    logger.info(`Captcha timeout for user ${member.id} in chat ${chatId} — kicking`);
+
+                    try {
+                        await ctx.api.banChatMember(chatId, member.id);
+                        await ctx.api.unbanChatMember(chatId, member.id); // ban+unban = kick
+                        await sendLog(ctx,
+                            `⏰ <b>Captcha Timeout</b>\n├ User: <a href="tg://user?id=${member.id}">${member.first_name}</a>\n└ Kicked after ${kickMinutes}m without verifying`
+                        );
+                    } catch (e) { logger.warn('Captcha kick failed:', e); }
+
+                    if (msgId) await ctx.api.deleteMessage(chatId, msgId).catch(() => {});
+                }, kickMinutes * 60 * 1000);
+
+                pendingCaptchas.set(captchaKey(chatId, member.id), { timeout, msgId });
+
+            } else {
+                // ── No captcha — send welcome directly ────────────────────────
+                await sendWelcome(ctx, chatId, member);
             }
         }
 
-        if ((oldStatus === 'member' || oldStatus === 'restricted' || oldStatus === 'administrator') && (newStatus === 'left' || newStatus === 'kicked')) {
-            if (member.is_bot) return;
+        // ── USER LEFT / KICKED ────────────────────────────────────────────────
+        const isLeave = (oldStatus === 'member' || oldStatus === 'restricted' || oldStatus === 'administrator') &&
+                        (newStatus === 'left' || newStatus === 'kicked');
 
-            logger.info(`User left: ${member.first_name} (${member.id})`);
-            await sendLog(ctx, `👋 <b>Member Left</b>\n├ User: <a href="tg://user?id=${member.id}">${member.first_name}</a>\n└ ID: <code>${member.id}</code>`);
+        if (isLeave && !member.is_bot) {
+            logger.info(`User left: ${member.first_name} (${member.id}) from chat ${chatId}`);
+
+            // Cancel pending captcha if they leave before verifying
+            cancelPendingCaptcha(chatId, member.id);
+
+            await sendLog(ctx,
+                `👋 <b>Member Left</b>\n` +
+                `├ User: <a href="tg://user?id=${member.id}">${member.first_name}</a>\n` +
+                `└ ID: <code>${member.id}</code>`
+            );
 
             const goodbyeMsg = ctx.session.goodbyeMessage;
             if (goodbyeMsg) {
@@ -105,43 +226,64 @@ export default (bot: Bot<BotContext>) => {
                     .replace(/\{chatname\}/g, ctx.chat?.title || 'Group')
                     .replace(/\{first\}/g, member.first_name)
                     .replace(/\{id\}/g, String(member.id));
-                await ctx.reply(text, { parse_mode: 'HTML' }).catch(() => {});
+                await ctx.api.sendMessage(chatId, text, { parse_mode: 'HTML' }).catch(() => {});
             }
         }
     });
+    // ─────────────────────────────────────────────────────────────────────────
 
-    bot.callbackQuery(/captcha_verify_(\d+)_(correct|wrong)/, async (ctx) => {
-        const userId = parseInt(ctx.match[1], 10);
-        const result = ctx.match[2];
+    // ── Captcha callback query handler ────────────────────────────────────────
+    bot.callbackQuery(/^captcha_verify_(\d+)_(correct|wrong)$/, async (ctx) => {
+        const userId  = parseInt(ctx.match[1], 10);
+        const result  = ctx.match[2];
+        const chatId  = ctx.chat?.id;
 
-        if (ctx.from.id !== userId) return ctx.answerCallbackQuery({ text: '❌ Not for you!', show_alert: true });
+        if (!chatId) return ctx.answerCallbackQuery();
+
+        // Only the correct user can answer their own captcha
+        if (ctx.from.id !== userId) {
+            return ctx.answerCallbackQuery({ text: '❌ This captcha is not for you!', show_alert: true });
+        }
 
         if (result === 'wrong') {
-            return ctx.answerCallbackQuery({ text: '❌ Wrong answer! Try again or wait for timeout.', show_alert: true });
+            return ctx.answerCallbackQuery({ text: '❌ Wrong answer! Try again.', show_alert: true });
         }
 
+        // ── Correct answer ────────────────────────────────────────────────────
+        cancelPendingCaptcha(chatId, userId);
+
         try {
-            await ctx.restrictChatMember(userId, {
-                can_send_messages: true, can_send_audios: true, can_send_documents: true,
-                can_send_photos: true, can_send_videos: true, can_send_video_notes: true,
-                can_send_voice_notes: true, can_send_polls: true, can_send_other_messages: true,
+            // Fully restore all default permissions
+            await ctx.api.restrictChatMember(chatId, userId, {
+                can_send_messages:         true,
+                can_send_audios:           true,
+                can_send_documents:        true,
+                can_send_photos:           true,
+                can_send_videos:           true,
+                can_send_video_notes:      true,
+                can_send_voice_notes:      true,
+                can_send_polls:            true,
+                can_send_other_messages:   true,
                 can_add_web_page_previews: true,
             });
-            await ctx.answerCallbackQuery({ text: '✅ Verified!' });
-            if (ctx.msg) await ctx.api.deleteMessage(ctx.chat?.id as number, ctx.msg.message_id);
-            
-            // Dispatch welcome message AFTER captcha success
-            const welcomeMsg = ctx.session.welcomeMessage;
-            if (welcomeMsg) {
-                let count = '?'; try { count = String(await ctx.getChatMemberCount()); } catch (e) {}
-                const text = welcomeMsg
-                    .replace(/\{user\}/g, `<a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a>`)
-                    .replace(/\{chatname\}/g, ctx.chat?.title || 'Group')
-                    .replace(/\{count\}/g, count)
-                    .replace(/\{first\}/g, ctx.from.first_name)
-                    .replace(/\{id\}/g, String(ctx.from.id));
-                await ctx.reply(text, { parse_mode: 'HTML' });
+
+            await ctx.answerCallbackQuery({ text: '✅ Verified! Welcome to the group.' });
+
+            // Delete the captcha message
+            if (ctx.msg?.message_id) {
+                await ctx.api.deleteMessage(chatId, ctx.msg.message_id).catch(() => {});
             }
-        } catch (error) { logger.error('CAPTCHA error:', error); }
+
+            // Send welcome message after successful verification
+            await sendWelcome(ctx, chatId, { id: userId, first_name: ctx.from.first_name });
+
+            await sendLog(ctx,
+                `✅ <b>Captcha Passed</b>\n├ User: <a href="tg://user?id=${userId}">${ctx.from.first_name}</a>\n└ ID: <code>${userId}</code>`
+            );
+        } catch (error) {
+            logger.error('CAPTCHA verification error:', error);
+            await ctx.answerCallbackQuery({ text: '⚠️ An error occurred. Please contact an admin.', show_alert: true });
+        }
     });
+    // ─────────────────────────────────────────────────────────────────────────
 };

@@ -175,7 +175,7 @@ async function init() {
       const PORT = process.env.PORT || 3000;
       server.listen(PORT, async () => {
         await bot.api.setWebhook(process.env.WEBHOOK_URL!, {
-          allowed_updates: ['message', 'edited_message', 'callback_query', 'chat_member']
+          allowed_updates: ['message', 'edited_message', 'callback_query', 'chat_member', 'my_chat_member']
         });
         logger.info(`Webhook server listening on port ${PORT}`);
       });
@@ -194,7 +194,7 @@ async function init() {
       const runner = run(bot, {
         runner: {
           fetch: {
-            allowed_updates: ['message', 'edited_message', 'callback_query', 'chat_member']
+            allowed_updates: ['message', 'edited_message', 'callback_query', 'chat_member', 'my_chat_member']
           }
         }
       });

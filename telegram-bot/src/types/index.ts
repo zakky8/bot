@@ -35,6 +35,9 @@ export interface SessionData {
   };
   logChannel?: number;
   goodbyeMessage?: string;
+  cleanService?: boolean;
+  cleanWelcome?: boolean;
+  lastWelcomeMsgId?: number;
   federations: { current?: string } & Record<string, { name: string; owner: number; admins: number[]; members: number[]; banned: number[] }>;
   language: string;
   userData: Record<string, unknown>;
