@@ -602,23 +602,42 @@ LANGUAGE RULE: Detect the language from the current user's message and reply ent
 
     let ragContext = '';
     if (this.vectorStore && ragQuery.length > 0) {
-        const hits = await this.vectorStore.search(ragQuery, 5);
-        if (hits.length > 0) {
-            // Separate deck/FAQ docs (high trust) from telegram_history (low trust — may contain old data)
-            const deckHits = hits.filter(h => h.metadata?.type === 'astarter_deck');
-            const histHits = hits.filter(h => h.metadata?.type === 'telegram_history');
+        // ── Two-pass RAG: deck chunks first (authoritative), history only as supplement ──
+        // Root cause of old-data answers: 929 telegram_history chunks vs 9 deck chunks means
+        // a flat search always fills slots with old Cardano DeFi chat messages. Fix: search
+        // each type separately, always show deck knowledge first, only include history when
+        // deck has fewer than 2 hits (i.e. question is community/sentiment, not product).
 
-            const parts: string[] = [];
-            if (deckHits.length > 0) {
-                parts.push('[AUTHORITATIVE — current project knowledge, use this]\n' + deckHits.map(h => h.pageContent).join('\n---\n'));
-            }
-            if (histHits.length > 0) {
-                parts.push('[HISTORICAL CHAT — may contain old Cardano DeFi info, cross-check with FAQ]\n' + histHits.map(h => h.pageContent).join('\n---\n'));
-            }
+        // Pass 1: current project knowledge
+        const deckHits = await this.vectorStore.searchFiltered(ragQuery, 3, ['astarter_deck', 'manual']);
+
+        // Pass 2: community chat — only when deck is sparse
+        const histHits = deckHits.length < 2
+            ? await this.vectorStore.searchFiltered(ragQuery, 2, ['telegram_history'])
+            : [];
+
+        const parts: string[] = [];
+        if (deckHits.length > 0) {
+            parts.push(
+                '## Current Project Knowledge (authoritative — use this)\n' +
+                deckHits.map(h => h.pageContent).join('\n---\n')
+            );
+        }
+        if (histHits.length > 0) {
+            parts.push(
+                '## Community Chat (supplementary — DISCARD any Cardano DeFi / launchpad / Astarter Swap / Money Market content, that is outdated)\n' +
+                histHits.map(h => h.pageContent).join('\n---\n')
+            );
+        }
+
+        if (parts.length > 0) {
             ragContext = parts.join('\n\n');
-            this.logger.info(`RAG: found ${hits.length} chunk(s) (${deckHits.length} deck, ${histHits.length} history) for: "${ragQuery.slice(0, 60)}"${isFollowUp ? ' [follow-up enriched]' : ''}`);
+            this.logger.info(
+                `RAG: ${deckHits.length} deck + ${histHits.length} history for: "${ragQuery.slice(0, 60)}"` +
+                (isFollowUp ? ' [follow-up]' : '')
+            );
         } else {
-            this.logger.info(`RAG: no chunks matched for query: "${ragQuery.slice(0, 60)}"`);
+            this.logger.info(`RAG: no chunks matched for: "${ragQuery.slice(0, 60)}"`);
         }
     }
 

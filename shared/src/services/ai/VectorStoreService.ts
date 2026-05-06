@@ -90,19 +90,41 @@ export class VectorStoreService {
         fs.writeFileSync(this.storagePath, JSON.stringify(this.docs, null, 2));
     }
 
-    async search(query: string, k: number = 3): Promise<{ pageContent: string; metadata: any }[]> {
+    async search(query: string, k: number = 3): Promise<{ pageContent: string; metadata: any; score: number }[]> {
+        return this.searchFiltered(query, k);
+    }
+
+    /**
+     * Search with optional metadata type filter.
+     * @param typeFilter If provided, only docs whose metadata.type is in this array are searched.
+     */
+    async searchFiltered(
+        query: string,
+        k: number = 3,
+        typeFilter?: string[],
+    ): Promise<{ pageContent: string; metadata: any; score: number }[]> {
         if (this.docs.length === 0) return [];
 
         try {
             const queryEmbedding = await this.getEmbedding(query);
 
-            const scored = this.docs.map(doc => ({
+            const pool = typeFilter
+                ? this.docs.filter(d => typeFilter.includes(d.metadata?.type ?? ''))
+                : this.docs;
+
+            if (pool.length === 0) return [];
+
+            const scored = pool.map(doc => ({
                 ...doc,
                 score: this.cosineSimilarity(queryEmbedding, doc.embedding)
             }));
 
             scored.sort((a, b) => b.score - a.score);
-            return scored.slice(0, k).map(d => ({ pageContent: d.pageContent, metadata: d.metadata }));
+            return scored.slice(0, k).map(d => ({
+                pageContent: d.pageContent,
+                metadata:    d.metadata,
+                score:       d.score,
+            }));
         } catch (err) {
             console.error(`Search embedding failed: ${err}`);
             return [];
