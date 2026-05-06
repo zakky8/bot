@@ -1,6 +1,7 @@
 import { Bot } from 'grammy';
 import { BotContext } from '../types';
 import { createLogger } from '../core/logger';
+import { isAdminOrOwner } from '../utils/permissions';
 
 const logger = createLogger('MessageEngine');
 
@@ -21,16 +22,16 @@ export default (bot: Bot<BotContext>) => {
             }
         }
 
-        // Handle Silent Mod triggers (!ban, !mute, etc)
+        // Handle Silent Mod triggers (!ban, !mute, etc) — admins/owners only
         if (text.startsWith('!') || text.startsWith('?')) {
             const command = text.split(' ')[0].slice(1).toLowerCase();
             const triggers = ['ban', 'mute', 'kick', 'warn', 'unban', 'unmute'];
 
             if (triggers.includes(command)) {
-                // Manually trigger the command handler for the equivalent slash command
-                // Note: We strip the ! or ? and use / instead
+                // Only admins/owners may use silent triggers
+                if (!(await isAdminOrOwner(ctx))) return next();
+                // Rewrite as slash command so the registered handler runs
                 ctx.message.text = `/${command}${text.slice(command.length + 1)}`;
-                // We let the command system take over
                 return next();
             }
         }

@@ -11,6 +11,7 @@ export default (bot: Bot<BotContext>) => {
             const mode = args[0]?.toLowerCase();
             if (!['button', 'math', 'text'].includes(mode)) return ctx.reply('Usage: /captchamode <button|math|text>\n\n• button — Press a button\n• math — Solve simple math\n• text — Type shown text');
 
+            if (!ctx.session.captcha) ctx.session.captcha = { enabled: false, mode: 'button' };
             ctx.session.captcha.mode = mode as 'button' | 'math' | 'text';
 
             await ctx.reply(`🔐 CAPTCHA mode set to <b>${mode}</b>.`, { parse_mode: 'HTML' });

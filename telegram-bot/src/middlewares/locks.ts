@@ -43,7 +43,7 @@ export const locksMiddleware = async (ctx: BotContext, next: NextFunction) => {
     else if (msg.story) triggerType = 'story';
 
     // 2. Advanced/Meta Locks
-    const entities = msg.entities || msg.caption_entities || [];
+    const entities = [...(msg.entities || []), ...(msg.caption_entities || [])];
     const hasLink = entities.some(e => e.type === 'url' || e.type === 'text_link');
     if (hasLink) triggerType = 'url';
     

@@ -38,13 +38,16 @@ export default (bot: Bot<BotContext>) => {
     }
 
     if (!LOCK_TYPES.includes(type)) {
-      return ctx.reply(`❌ <b>Invalid type.</b>\nTry: <code>photo, sticker, links, etc.</code>`, { parse_mode: 'HTML' });
+      return ctx.reply(`❌ <b>Invalid type.</b>\nTry: <code>photo, sticker, url, forward, etc.</code>\n\nRun /locktypes to see all available types.`, { parse_mode: 'HTML' });
     }
 
     const validModes = ['off', 'warn', 'mute', 'kick', 'ban'];
     if (!validModes.includes(mode)) {
         return ctx.reply(`❌ <b>Invalid mode.</b>\nUse: <code>off, warn, mute, kick, ban</code>`, { parse_mode: 'HTML' });
     }
+
+    // Guard against uninitialized session
+    if (!ctx.session.locks) ctx.session.locks = {};
 
     ctx.session.locks[type] = {
         mode: mode,

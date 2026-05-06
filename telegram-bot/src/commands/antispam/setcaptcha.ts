@@ -11,6 +11,7 @@ export default (bot: Bot<BotContext>) => {
             const mode = args[0]?.toLowerCase();
             if (!['on', 'off'].includes(mode)) return ctx.reply('Usage: /setcaptcha <on|off>');
 
+            if (!ctx.session.captcha) ctx.session.captcha = { enabled: false, mode: 'button' };
             ctx.session.captcha.enabled = (mode === 'on');
 
             await ctx.reply(mode === 'on' ? '🔐 CAPTCHA verification <b>enabled</b>. New users must verify before chatting.' : '🔓 CAPTCHA verification <b>disabled</b>.', { parse_mode: 'HTML' });
