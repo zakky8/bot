@@ -250,6 +250,22 @@ export class AIService {
       : null;
 
     // ── TRINITY persona — ElevenLabs-style, natural knowledge blending ────────
+    const OFFICIAL_LINKS = `
+OFFICIAL ASTARTER LINKS (always use these exact URLs, never others):
+• Website: https://www.astarter.io/
+• Telegram Community: https://t.me/AstarterDefiHubOfficial
+• Telegram Announcements: https://t.me/Astarteranncmnt
+• Twitter/X: https://x.com/AstarterDefiHub
+• Discord: https://discord.gg/XXDEjFPrgR
+• Medium: https://medium.com/@AstarterDefiHub
+• Reddit: https://www.reddit.com/r/Astarter/
+• YouTube: https://youtube.com/c/astartertv
+• Zealy: https://zealy.io/cw/astarterdefihub/leaderboard
+• Documentation: https://astarter.gitbook.io/astarter
+• Linktree: https://linktr.ee/Astarter
+• Email: contact@astarter.io
+`.trim();
+
     this.cachedSystemPrompt = `# Identity
 You are ${name}, Astarter's community assistant. You're friendly, sharp, and genuinely know your stuff — the kind of person who makes complex DeFi topics feel approachable without dumbing them down. You live in this Telegram group and you're here to help.
 
@@ -277,6 +293,11 @@ ${faqBlock ? `Here's the core knowledge you should have at your fingertips:\n\n$
 If you genuinely don't have the info: "Hmm, I don't have solid details on that one — best bet is the official docs or hitting up the support team directly."
 
 Never make up token prices, dates, wallet addresses, or technical specs. Never give financial or investment advice.
+
+# Official Links
+${OFFICIAL_LINKS}
+
+Whenever you mention or share links, ONLY use the URLs above. Never reference unofficial, outdated, or scam links.
 
 # Guardrails
 Stay on Astarter and the Cardano DeFi space. Off-topic? Acknowledge lightly and steer back: "That's a bit out of my lane! I'm ${name}, Astarter's assistant — what can I help you with?"
@@ -494,13 +515,30 @@ Detect the user's language from their message and reply in the same language. In
 
     // 4. RAG: Search for relevant context
     // Strip "[Context: User is @x]\n" prefix so it doesn't pollute the embedding query
-    const ragQuery = safeMessage.replace(/^\[Context:[^\]]*\]\n?/i, '').trim();
+    const cleanCurrent = safeMessage.replace(/^\[Context:[^\]]*\]\n?/i, '').trim();
+
+    // For follow-up questions, enrich the RAG query with the last assistant reply
+    // so short follow-ups like "what about fees?" find the right context
+    const lastAssistant = context.messages
+        .filter(m => m.role === 'assistant')
+        .slice(-1)[0]?.content ?? '';
+    const lastUser = context.messages
+        .filter(m => m.role === 'user')
+        .slice(-1)[0]?.content
+        ?.replace(/^\[Context:[^\]]*\]\n?/i, '').trim() ?? '';
+
+    // If this looks like a short follow-up (<60 chars), prepend previous turn for richer search
+    const isFollowUp = cleanCurrent.length < 60 && lastUser.length > 0;
+    const ragQuery = isFollowUp
+        ? `${lastUser} ${cleanCurrent}`.slice(0, 400)
+        : cleanCurrent;
+
     let ragContext = '';
     if (this.vectorStore && ragQuery.length > 0) {
-        const hits = await this.vectorStore.search(ragQuery, 3);
+        const hits = await this.vectorStore.search(ragQuery, 4);
         if (hits.length > 0) {
             ragContext = hits.map(h => h.pageContent).join('\n---\n');
-            this.logger.info(`RAG: found ${hits.length} chunk(s) for query: "${ragQuery.slice(0, 60)}"`);
+            this.logger.info(`RAG: found ${hits.length} chunk(s) for query: "${ragQuery.slice(0, 60)}"${isFollowUp ? ' [follow-up enriched]' : ''}`);
         } else {
             this.logger.info(`RAG: no chunks matched for query: "${ragQuery.slice(0, 60)}"`);
         }

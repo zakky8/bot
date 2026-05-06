@@ -4,12 +4,12 @@
     "a": "Astarter is a key DeFi infrastructure hub on Cardano, focused on providing a comprehensive ecosystem including an IDO Launchpad, DEX (Astarter Swap), and Money Market. It aims to boost the Cardano ecosystem by supporting high-quality projects and providing liquidity solutions."
   },
   {
-    "q": "Where can I find the official links for Astarter?",
-    "a": "You can find all official links on our Linktree: https://linktr.ee/Astarter. Key links include our Website (https://astarter.io), Documentation (https://docs.astarter.io), and Twitter (@AstarterDefiHub)."
+    "q": "Where can I find the official Astarter links?",
+    "a": "Here are all official Astarter links:\n• Website: https://www.astarter.io/\n• Telegram Community: https://t.me/AstarterDefiHubOfficial\n• Telegram Announcements: https://t.me/Astarteranncmnt\n• Twitter/X: https://x.com/AstarterDefiHub\n• Discord: https://discord.gg/XXDEjFPrgR\n• Medium: https://medium.com/@AstarterDefiHub\n• Reddit: https://www.reddit.com/r/Astarter/\n• YouTube: https://youtube.com/c/astartertv\n• Zealy: https://zealy.io/cw/astarterdefihub/leaderboard\n• Documentation/Gitbook: https://astarter.gitbook.io/astarter\n• Linktree: https://linktr.ee/Astarter\n• Email: contact@astarter.io"
   },
   {
     "q": "How can I join the Astarter community?",
-    "a": "You can join our community on Telegram (https://t.me/astarter_chat), Discord (https://discord.gg/astarter), and follow us on Twitter for the latest updates."
+    "a": "Join the Astarter community here:\n• Telegram: https://t.me/AstarterDefiHubOfficial\n• Discord: https://discord.gg/XXDEjFPrgR\n• Twitter/X: https://x.com/AstarterDefiHub\n• Reddit: https://www.reddit.com/r/Astarter/\nFor announcements follow: https://t.me/Astarteranncmnt"
   },
   {
     "q": "What is the Astarter Launchpad?",
@@ -17,14 +17,18 @@
   },
   {
     "q": "Where can I read the project documentation?",
-    "a": "Our comprehensive technical and project documentation is available at https://docs.astarter.io."
+    "a": "The official Astarter documentation and technical details are available at https://astarter.gitbook.io/astarter"
   },
   {
     "q": "Does Astarter have a token?",
-    "a": "Yes, Astarter has its own ecosystem token. You can find details about the token utility and tokenomics in our docs: https://docs.astarter.io/astarter-tokenomics."
+    "a": "Yes, Astarter has its own ecosystem token, AA. You can find details about token utility and tokenomics in the official docs: https://astarter.gitbook.io/astarter"
   },
   {
-    "q": "Where can I find the source code?",
-    "a": "Astarter's open-source repositories can be found on GitHub: https://github.com/astarter."
+    "q": "What is the official Astarter website?",
+    "a": "The official Astarter website is https://www.astarter.io/ — always verify you are on this domain before connecting your wallet."
+  },
+  {
+    "q": "How do I contact Astarter support?",
+    "a": "You can reach Astarter support by email at contact@astarter.io, or by posting in the official Telegram community at https://t.me/AstarterDefiHubOfficial"
   }
 ]
