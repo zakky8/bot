@@ -144,13 +144,12 @@ export default (bot: Bot<BotContext>) => {
       text = text.replace(/\n{3,}/g, '\n\n').trim();
       // ─────────────────────────────────────────────────────────────────────────
 
-      // Always prepend correct username in group chats.
-      // This fixes cases where AI picks up a different name from RAG context.
+      // In groups the reply already quotes the user's message (reply_parameters).
+      // No need to prepend username — AI addresses them naturally in the response.
+      // But ensure any @handle the AI put at the very top (as a bare line) is stripped
+      // so we never have a naked "@username\nHey @username..." double-mention.
       if (isGroup) {
-        // Strip any wrongly-prepended @handle that isn't the current user
-        // (AI may have addressed someone from the RAG history)
-        text = text.replace(/^@\w+\n/, '');
-        text = `${username}\n${text}`;
+        text = text.replace(/^@[\w]+\s*\n/, '');
       }
 
       // Reply-to: quote the member's message in every group response
@@ -169,7 +168,25 @@ export default (bot: Bot<BotContext>) => {
       }
     } catch (error: any) {
       console.error('AI Error:', error);
-      await ctx.reply('🤖 AI is temporarily unavailable. Please try again later.');
+
+      // Send real error details to mod chat so issues can be diagnosed
+      const modChatId = process.env.HUMAN_MODERATOR_CHAT_ID;
+      if (modChatId) {
+        const errMsg = error?.message ?? String(error);
+        ctx.api.sendMessage(
+          parseInt(modChatId, 10),
+          `⚠️ <b>AI Error</b>\nUser: <code>${ctx.from?.id}</code> (${ctx.from?.username ?? ctx.from?.first_name})\nMsg: ${message?.slice(0, 200)}\nError: <code>${errMsg.slice(0, 400)}</code>`,
+          { parse_mode: 'HTML' }
+        ).catch(() => {});
+      }
+
+      const isThrottle = (error?.message ?? '').toLowerCase().includes('throttl') ||
+                         (error?.name ?? '').includes('Throttling') ||
+                         (error?.message ?? '').toLowerCase().includes('too many requests');
+      const userMsg = isThrottle
+        ? '⏳ I\'m handling a lot of questions right now — please try again in a few seconds!'
+        : '🤖 Something went wrong on my end. Please try again shortly.';
+      await ctx.reply(userMsg);
     }
   };
 

@@ -266,8 +266,8 @@ OFFICIAL ASTARTER LINKS (always use these exact URLs, never others):
 • Email: contact@astarter.io
 `.trim();
 
-    this.cachedSystemPrompt = `⚠️ CRITICAL RULES — read before anything else:
-1. CURRENT USER: Every user message starts with [Context: User is X]. That X is the ONLY person you're talking to right now. Address ONLY them by that name. Names that appear in the # Context section are old chat history participants — NOT the current user. NEVER address the current user by a name from the Context section.
+    this.cachedSystemPrompt = `=== CRITICAL RULES — apply before everything else ===
+1. CURRENT USER: Every user message starts with [Context: User is X]. That X is the ONLY person you're talking to right now. Do NOT start your reply by greeting them or repeating their name — just answer directly. Names in the # Context section below are old chat history participants, NOT the current user. NEVER address the current user by a name from the Context section.
 2. CURRENT PROJECT: Astarter is now a Web4/AI/DePIN infrastructure project (ABox nodes, CORE agent layer, AI DEX, Prediction Market). It is NO LONGER a Cardano DeFi launchpad. IGNORE any context about: Astarter Launchpad, IDO, Astarter Swap, Money Market, Cardano ADA pools, old governance docs — that is all OUTDATED.
 3. LINKS: You ONLY output links from the # Official Links section below. NEVER output links containing "docs.astarter.io", "astarter.gitbook.io/en", or any URL not listed in # Official Links. When directing to docs, ALWAYS include the URL inline — write "check the docs at https://astarter.gitbook.io/astarter". NEVER end a sentence with "check the docs:" or "see the documentation:" and stop there without a URL — that is an incomplete response.
 4. LANGUAGE: Detect the language of the current user's message and reply 100% in that language. Each user is independent — never let one user's language bleed into another user's response.
@@ -424,6 +424,42 @@ LANGUAGE RULE: Detect the language from the current user's message and reply ent
   }
 
 
+  /**
+   * Sanitise a message list for Bedrock's ConverseCommand requirements:
+   *  - Remove system-role and empty-content messages
+   *  - Ensure strict user/assistant alternation (merge or drop consecutive same-role entries)
+   *  - Must start with 'user' role
+   */
+  private sanitizeMessagesForBedrock(messages: AIMessage[]): Array<{ role: 'user' | 'assistant'; content: string }> {
+    // 1. Keep only user/assistant with non-empty content
+    const filtered = messages
+      .filter(m => m.role !== 'system' && m.content && m.content.trim().length > 0)
+      .map(m => ({ role: (m.role === 'assistant' ? 'assistant' : 'user') as 'user' | 'assistant', content: m.content }));
+
+    if (filtered.length === 0) return filtered;
+
+    // 2. Merge consecutive same-role entries (join with newline)
+    const merged: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+    for (const msg of filtered) {
+      if (merged.length > 0 && merged[merged.length - 1].role === msg.role) {
+        merged[merged.length - 1].content += '\n' + msg.content;
+      } else {
+        merged.push({ ...msg });
+      }
+    }
+
+    // 3. Must start with 'user'
+    while (merged.length > 0 && merged[0].role !== 'user') {
+      merged.shift();
+    }
+
+    return merged;
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
   private async generateWithAWS(
     messages: AIMessage[],
     systemPrompt: string,
@@ -432,19 +468,34 @@ LANGUAGE RULE: Detect the language from the current user's message and reply ent
     if (!this.bedrock) throw new Error('AWS Bedrock not initialised');
 
     let modelToUse = model ?? this.config.defaultModel;
-    // Default to Claude 3 Haiku if a non-Bedrock model name is passed
     if (!modelToUse.includes('.')) {
         modelToUse = 'anthropic.claude-3-haiku-20240307-v1:0';
     }
 
-    this.logger.info(`Generating with AWS Bedrock (${modelToUse})...`);
+    // Sanitise messages before sending — Bedrock requires strict alternation
+    const sanitized = this.sanitizeMessagesForBedrock(messages);
+    if (sanitized.length === 0) {
+      throw new Error('No valid messages after sanitisation');
+    }
 
-    try {
+    const RETRYABLE = new Set([
+      'ThrottlingException',
+      'ServiceUnavailableException',
+      'InternalServerException',
+      'ModelTimeoutException',
+    ]);
+    const MAX_ATTEMPTS = 4;
+    let lastErr: any;
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        this.logger.info(`AWS Bedrock attempt ${attempt}/${MAX_ATTEMPTS} (${modelToUse})`);
+
         const command = new ConverseCommand({
           modelId: modelToUse,
           system: [{ text: systemPrompt }],
-          messages: messages.map(m => ({
-            role: m.role === 'assistant' ? 'assistant' : 'user',
+          messages: sanitized.map(m => ({
+            role: m.role,
             content: [{ text: m.content }]
           })),
           inferenceConfig: {
@@ -456,25 +507,35 @@ LANGUAGE RULE: Detect the language from the current user's message and reply ent
         const response = await this.bedrock.send(command);
         const stopReason = response.stopReason;
         const contentBlocks = response.output?.message?.content || [];
-        
-        // Find the first block that has text
-        const textBlock = contentBlocks.find(b => b.text !== undefined);
+        const textBlock = contentBlocks.find((b: any) => b.text !== undefined);
         const text = textBlock?.text?.trim();
 
         if (!text) {
-          this.logger.error(`AWS Bedrock returned no text. StopReason: ${stopReason}. Full response:`, JSON.stringify(response, null, 2));
+          this.logger.error(`AWS Bedrock no text. StopReason: ${stopReason}`);
           throw new Error(`AWS Bedrock returned no text. StopReason: ${stopReason}`);
         }
 
-        return {
-          content:  text,
-          model:    modelToUse,
-          provider: 'aws',
-        };
-    } catch (err: any) {
-        this.logger.error(`AWS Bedrock Error: ${err.message}`);
+        return { content: text, model: modelToUse, provider: 'aws' };
+
+      } catch (err: any) {
+        lastErr = err;
+        const code: string = err?.name ?? err?.code ?? err?.errorCode ?? '';
+        const isRetryable = RETRYABLE.has(code) ||
+            (err?.message ?? '').toLowerCase().includes('throttl') ||
+            (err?.message ?? '').toLowerCase().includes('too many requests');
+
+        if (isRetryable && attempt < MAX_ATTEMPTS) {
+          const delay = Math.pow(2, attempt) * 600; // 1.2s, 2.4s, 4.8s
+          this.logger.warn(`AWS Bedrock throttled (${code}) — retry ${attempt}/${MAX_ATTEMPTS - 1} in ${delay}ms`);
+          await this.sleep(delay);
+          continue;
+        }
+        this.logger.error(`AWS Bedrock failed (attempt ${attempt}/${MAX_ATTEMPTS}): ${err.message}`);
         throw err;
+      }
     }
+
+    throw lastErr ?? new Error('AWS Bedrock: max retries exceeded');
   }
 
 
@@ -549,10 +610,10 @@ LANGUAGE RULE: Detect the language from the current user's message and reply ent
 
             const parts: string[] = [];
             if (deckHits.length > 0) {
-                parts.push('## Current Astarter Knowledge (authoritative — use this)\n' + deckHits.map(h => h.pageContent).join('\n---\n'));
+                parts.push('[AUTHORITATIVE — current project knowledge, use this]\n' + deckHits.map(h => h.pageContent).join('\n---\n'));
             }
             if (histHits.length > 0) {
-                parts.push('## Historical Chat Context (may contain outdated product info — cross-check against FAQ before using)\n' + histHits.map(h => h.pageContent).join('\n---\n'));
+                parts.push('[HISTORICAL CHAT — may contain old Cardano DeFi info, cross-check with FAQ]\n' + histHits.map(h => h.pageContent).join('\n---\n'));
             }
             ragContext = parts.join('\n\n');
             this.logger.info(`RAG: found ${hits.length} chunk(s) (${deckHits.length} deck, ${histHits.length} history) for: "${ragQuery.slice(0, 60)}"${isFollowUp ? ' [follow-up enriched]' : ''}`);
