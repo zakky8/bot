@@ -12,7 +12,7 @@ export class VectorStoreService {
     private docs: VectorDoc[] = [];
     private bedrock: BedrockRuntimeClient;
     private storagePath: string;
-    private modelId = "amazon.titan-embed-text-v1";
+    private modelId = "amazon.titan-embed-text-v2:0";
 
     constructor(config: { accessKeyId: string; secretAccessKey: string; region: string }, storagePath: string) {
         this.bedrock = new BedrockRuntimeClient({
