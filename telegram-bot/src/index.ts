@@ -22,6 +22,7 @@ import { locksMiddleware } from './middlewares/locks';
 import { floodMiddleware } from './middlewares/flood';
 import { contentMiddleware } from './middlewares/content';
 import { BotContext, SessionData } from './types';
+import { isBotAdmin } from './utils/permissions';
 
 const i18n = new I18n<BotContext>({
   defaultLocale: 'en',
@@ -80,6 +81,15 @@ bot.use(session({
 bot.use(i18n);
 bot.use(loggingMiddleware);
 bot.use(userTrackerMiddleware);
+
+// Restriction: Only Bot Admins/Owners can use the bot in DMs
+bot.on('message', async (ctx, next) => {
+  if (ctx.chat?.type === 'private' && !isBotAdmin(ctx)) {
+    return; // Silent ignore for non-admins in DM
+  }
+  return next();
+});
+
 bot.use(authMiddleware);
 bot.use(locksMiddleware);
 bot.use(floodMiddleware);

@@ -1,6 +1,7 @@
 import { Bot } from 'grammy';
 import { BotContext } from '../../types';
 import { aiService } from '../../core/ai';
+import { isBotAdmin } from '../../utils/permissions';
 
 export default (bot: Bot<BotContext>) => {
   /**
@@ -75,24 +76,20 @@ export default (bot: Bot<BotContext>) => {
     }
   };
 
-  bot.on('message:text', async (ctx, next) => {
-    const botUser = await bot.api.getMe();
-    const isMention = ctx.msg.text.includes(`@${botUser.username}`);
-    const isReplyToBot = ctx.msg.reply_to_message?.from?.id === botUser.id;
-
-    if (isMention || isReplyToBot || ctx.chat.type === 'private') {
-        const text = ctx.msg.text.replace(`@${botUser.username}`, '').trim();
-        if (text.startsWith('/')) return next(); // Let commands handle it
-        return handleAiChat(ctx, text);
+  // Remove auto-chat logic. AI now only responds via /ask command.
+  
+  bot.command('ask', async (ctx) => {
+    // 1. Restriction: Only Bot Admins and Owner can use this
+    if (!isBotAdmin(ctx)) {
+        // If in DM, completely ignore non-admins/non-owners
+        if (ctx.chat.type === 'private') return;
+        // In groups, you might want to show a message or just ignore
+        return; 
     }
-    return next();
-  });
 
-  bot.command(['chat', 'ask'], async (ctx) => {
     const message = (ctx.match as string)?.trim();
     if (!message) {
-      const cmd = ctx.msg?.text?.split(' ')[0] || '/chat';
-      return ctx.reply(`💬 Usage: <code>${cmd} &lt;message&gt;</code>`, { parse_mode: 'HTML' });
+      return ctx.reply(`💬 Usage: <code>/ask &lt;message&gt;</code>`, { parse_mode: 'HTML' });
     }
 
     if (message.toLowerCase() === 'clear') {
@@ -106,6 +103,7 @@ export default (bot: Bot<BotContext>) => {
   });
 
   bot.command('support', async (ctx) => {
+    // Support command remains for everyone to reach mods
     const message = (ctx.match as string)?.trim();
     if (!message) {
       return ctx.reply('🙋 Usage: <code>/support &lt;issue&gt;</code>', { parse_mode: 'HTML' });
