@@ -1,6 +1,6 @@
-# Super Bot — Advanced Multi-Platform Bot System
+# Super Bot — Advanced Multi-Platform Bot System with RAG
 
-> Production-ready multi-platform bot system for **Telegram** and **Discord** — combining 159 moderation/management commands with **Claude AI** support automation. Both bots share a single Anthropic-powered AI service with FAQ-based answers, prompt-injection protection, conversation memory, and human escalation.
+> Production-ready multi-platform bot system for **Telegram** and **Discord** — combining 159 moderation/management commands with **Sophisticated RAG (Retrieval-Augmented Generation)** support automation. Both bots share a single **AWS Bedrock** powered AI service with persistent vector embeddings, automated hallucination checks, document indexing (PDF/URL), conversation memory, and human escalation.
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)
 ![Node.js](https://img.shields.io/badge/Node.js-18+-green)
@@ -132,52 +132,39 @@ super-bot/
 
 ---
 
-## AI System — Anthropic Claude
+---
 
-Both bots use the **same `AIService`** from `shared/src/services/ai/AIService.ts`. It is the core of the upgrade — replacing the original OpenRouter integration with a fully production-grade Anthropic Claude AI system.
+## AI System — AWS Bedrock RAG
 
-### How It Works
+Both bots use the same `AIService` from `shared/src/services/ai/AIService.ts`. The system has been upgraded from simple FAQ lookups to a full **Retrieval-Augmented Generation (RAG)** pipeline.
 
-```
-User message
-    │
-    ▼
-sanitizeInput()          ← Prompt injection check + 1 000-char cap
-    │
-    ▼
-checkRateLimit()         ← Redis-backed (20 req / hour / user)
-    │
-    ▼
-buildSystemPrompt()      ← FAQ-based system prompt (from faq_data.json)
-    │
-    ▼
-generateWithAnthropic()  ← Anthropic Claude (primary)
-    │  (on failure)
-    └─► generateWithOllama()  ← Ollama local model (fallback)
-    │
-    ▼
-"ESCALATE" check         ← If AI returns ESCALATE → isEscalation: true
-    │
-    ▼
-saveConversationContext() ← Last 20 messages stored in Redis
-    │
-    ▼
-AIResponse { content, model, provider, tokensUsed, isEscalation? }
+### How It Works (RAG Pipeline)
+
+```mermaid
+graph TD
+    A[User Message] --> B[Similarity Search]
+    B --> C[Fetch relevant chunks from Vector DB]
+    C --> D[Inject Context into Prompt]
+    D --> E[Sanitize & Rate Limit]
+    E --> F[Generate with AWS Bedrock]
+    F --> G[Hallucination Check]
+    G -- "Factual" --> H[Save Context & Reply]
+    G -- "Hallucinated" --> F
 ```
 
 ### Feature Summary
 
 | Feature | Detail |
 |---|---|
-| **Primary AI** | Anthropic Claude via `@anthropic-ai/sdk` — reads `ANTHROPIC_API_KEY` |
-| **FAQ-based answers** | Loads `faq_data.json`, builds system prompt — AI only answers from FAQ |
-| **Prompt injection guard** | 8 blocked phrases — attempts are logged and replaced with a safe fallback |
-| **Input cap** | Messages truncated at 1 000 characters |
-| **Human escalation** | AI returns `ESCALATE` → `isEscalation: true` → bot notifies moderator |
-| **Conversation memory** | Last 20 messages (10 turns) in Redis per user per chat |
-| **Rate limiting** | 20 requests per hour per user (Redis-backed, falls back to in-memory) |
-| **Ollama fallback** | When Anthropic API fails, auto-falls back to local Ollama model |
-| **Hot FAQ reload** | `/aisetup faq` reloads FAQ without restarting the bot |
+| **Primary AI** | AWS Bedrock (Claude 3 / Mistral / Titan) |
+| **RAG Knowledge Base** | Persistent Vector Store via local JSON DB + Titan Embeddings |
+| **Document Indexing** | Support for PDFs, TXT files, and Web Scraping (with Medium bypass) |
+| **Hallucination Check** | Post-generation self-reflection step to ensure factual accuracy |
+| **Prompt Injection Guard** | 8 blocked phrases to prevent system prompt leaking |
+| **Input Cap** | Messages truncated at 1,000 characters for safety |
+| **Human Escalation** | AI returns `ESCALATE` → bot notifies moderator channel |
+| **Conversation Memory** | Last 20 messages stored in Redis per user per chat |
+| **Rate Limiting** | 20 requests per hour per user (Redis-backed) |
 
 ### AI Commands
 
@@ -185,15 +172,16 @@ AIResponse { content, model, provider, tokensUsed, isEscalation? }
 
 | Command | Description |
 |---|---|
-| `/chat <message>` | Ask Claude AI anything — FAQ-constrained answers |
-| `/chat clear` | Reset your conversation history |
-| `/ask <question>` | Alias for `/chat` |
+| `/chat <message>` | Ask the AI — contextually grounded in your Knowledge Base |
+| `/aion` / `/aioff` | Enable or disable the AI for the current group (Admin Only) |
+| `/adddoc <url/text>` | Index a website or text note into the Vector DB |
+| `/adddoc (reply)` | Reply to a PDF or TXT file with this to index it |
+| `/removedoc <name>` | Delete a specific document from the Knowledge Base |
+| `/docstats` | View current Knowledge Base status and statistics |
+| `/clearall` | Completely reset the Knowledge Base (Owner Only) |
 | `/support <issue>` | Escalate directly to a human moderator |
-| `/aisetup key <key>` | Set the Anthropic API key at runtime |
-| `/aisetup model <model>` | Switch the active Claude model |
 | `/aisetup status` | Show current AI configuration and provider status |
-| `/aisetup test` | Send a live test message to Claude and report latency |
-| `/aisetup faq` | Hot-reload `faq_data.json` without restarting |
+| `/aisetup test` | Send a live test message and report latency |
 
 **Discord:**
 
