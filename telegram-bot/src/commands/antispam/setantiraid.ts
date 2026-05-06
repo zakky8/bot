@@ -6,16 +6,24 @@ export default (bot: Bot<BotContext>) => {
         try {
             if (!ctx.chat || ctx.chat.type === 'private') return ctx.reply('Groups only.');
             const admins = await ctx.getChatAdministrators();
-            if (!admins.some(a => a.user.id === ctx.from?.id)) return ctx.reply('❌ Admin only.');
-            const args = ctx.message?.text?.split(' ').slice(1) || [];
-            const mode = args[0]?.toLowerCase();
-            if (!['on', 'off', 'kick', 'ban', 'mute'].includes(mode)) {
-                return ctx.reply('Usage: /setantiraid <on|off|kick|ban|mute>\n\n• on — Enable with default settings\n• off — Disable\n• kick/ban/mute — Enable with specific action');
-            }
-            if (mode === 'off') {
-                return ctx.reply('🛡️ Anti-raid protection <b>disabled</b>.', { parse_mode: 'HTML' });
-            }
-            await ctx.reply(`🛡️ Anti-raid protection <b>enabled</b>.\nAction: <b>${mode === 'on' ? 'kick' : mode}</b>\nNew users joining rapidly will be actioned.`, { parse_mode: 'HTML' });
+            if (!admins.some(a => a.user.id === ctx.from?.id)) return ctx.reply('❌ <b>Access Denied:</b> You need administrative privileges to use this command.', { parse_mode: 'HTML' }).then(msg => { setTimeout(() => { ctx.deleteMessage().catch(()=>{}); ctx.api.deleteMessage(ctx.chat!.id, msg.message_id).catch(()=>{}); }, 5000); });
+
+            return ctx.reply(
+                '🛡️ <b>Anti-Raid Configuration</b>\n\n' +
+                'The anti-raid system works in two modes:\n\n' +
+                '<b>🔴 Standby (default):</b>\n' +
+                '• New users are muted & tracked silently\n' +
+                '• Use /antiraid on to kick all tracked users\n\n' +
+                '<b>🟢 Active:</b>\n' +
+                '• New users are instantly kicked (not banned)\n' +
+                '• They can rejoin after the raid is over\n\n' +
+                '<b>Commands:</b>\n' +
+                '• /antiraid — View status\n' +
+                '• /antiraid on — Activate & purge raiders\n' +
+                '• /antiraid off — Return to standby\n' +
+                '• /clearraid — Clear tracked user list',
+                { parse_mode: 'HTML' }
+            );
         } catch (error) { console.error('setantiraid error:', error); await ctx.reply('❌ An error occurred.'); }
     });
 };

@@ -1,40 +1,53 @@
 import { Bot } from 'grammy';
 import { BotContext } from '../../types';
+import { sendLog } from '../../utils';
+import { resolveUser } from '../../utils/user';
 
 export default (bot: Bot<BotContext>) => {
     bot.command('ban', async (ctx: BotContext) => {
-        if (!ctx.chat || ctx.chat.type === 'private') {
-            return ctx.reply('This command can only be used in groups.');
-        }
-
+        if (!ctx.chat || ctx.chat.type === 'private') return ctx.reply('Groups only.');
         if (!ctx.from) return;
 
-        // Check if user is admin
         const member = await ctx.getChatMember(ctx.from.id);
         if (!['creator', 'administrator'].includes(member.status)) {
-            return ctx.reply('❌ You need to be an admin to use this command.');
+            return ctx.reply('❌ Admin privileges required.').then(msg => setTimeout(() => { ctx.deleteMessage().catch(()=>{}); ctx.api.deleteMessage(ctx.chat!.id, msg.message_id).catch(()=>{}); }, 5000));
         }
 
         const replyTo = ctx.message?.reply_to_message;
-        if (!replyTo) {
-            return ctx.reply('❌ Reply to a message from the user you want to ban.');
+        let userToBanId: number | undefined;
+        let userToBanName: string | undefined;
+        let reason = 'No reason provided';
+
+        const args = ctx.message?.text?.split(/\s+/) || [];
+        const cmdArgs = args.slice(1);
+
+        if (replyTo?.from) {
+            userToBanId = replyTo.from.id;
+            userToBanName = replyTo.from.first_name;
+            reason = cmdArgs.join(' ') || 'No reason provided';
+        } else if (cmdArgs.length > 0) {
+            const resolved = await resolveUser(ctx, cmdArgs[0]);
+            if (resolved) {
+                userToBanId = resolved.id;
+                userToBanName = resolved.name;
+                reason = cmdArgs.slice(1).join(' ') || 'No reason provided';
+            } else {
+                return ctx.reply(`❌ Could not find a user with the identifier ${cmdArgs[0]}.`);
+            }
         }
 
-        const userToBan = replyTo.from;
-        if (!userToBan) {
-            return ctx.reply('❌ Could not identify the user.');
-        }
+        if (!userToBanId) return ctx.reply('❌ Reply to a user or provide a username/ID to ban them.');
 
         try {
-            await ctx.banChatMember(userToBan.id);
-            await ctx.reply(
-                `✅ Banned ${userToBan.first_name}\n` +
-                `👤 User ID: ${userToBan.id}\n` +
-                `👮 Banned by: ${ctx.from.first_name}`
+            await ctx.banChatMember(userToBanId);
+            await ctx.reply(`🚫 <b>Banned</b> <a href="tg://user?id=${userToBanId}">${userToBanName}</a>\n└ Reason: ${reason}`, { parse_mode: 'HTML' });
+            
+            await sendLog(ctx, 
+                `🚫 <b>Action: Ban</b>\n` +
+                `├ Target: <a href="tg://user?id=${userToBanId}">${userToBanName}</a> (<code>${userToBanId}</code>)\n` +
+                `├ Admin: <a href="tg://user?id=${ctx.from.id}">${ctx.from.first_name}</a>\n` +
+                `└ Reason: ${reason}`
             );
-        } catch (error) {
-            console.error('Ban error:', error);
-            await ctx.reply('❌ Failed to ban the user. Make sure the bot has admin rights.');
-        }
+        } catch (error) { await ctx.reply('❌ Failed to ban. Check permissions.'); }
     });
 };

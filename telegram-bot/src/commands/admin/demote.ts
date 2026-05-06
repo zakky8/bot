@@ -7,7 +7,7 @@ export default (bot: Bot<BotContext>) => {
             if (!ctx.chat || ctx.chat.type === 'private') return ctx.reply('Groups only.');
             const admins = await ctx.getChatAdministrators();
             const caller = admins.find(a => a.user.id === ctx.from?.id);
-            if (!caller || caller.status !== 'creator') return ctx.reply('❌ Only the group owner can demote admins.');
+            if (!caller || caller.status !== 'creator') return ctx.reply('❌ <b>Access Denied:</b> Only the group owner can use this command.', { parse_mode: 'HTML' }).then(msg => { setTimeout(() => { ctx.deleteMessage().catch(()=>{}); ctx.api.deleteMessage(ctx.chat!.id, msg.message_id).catch(()=>{}); }, 5000); });
 
             const reply = ctx.message?.reply_to_message;
             if (!reply?.from) return ctx.reply('❌ Reply to an admin to demote them.');

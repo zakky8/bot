@@ -5,7 +5,20 @@ export default (bot: Bot<BotContext>) => {
     bot.command('flood', async (ctx: BotContext) => {
         try {
             if (!ctx.chat || ctx.chat.type === 'private') return ctx.reply('Groups only.');
-            await ctx.reply('🌊 <b>Flood Settings</b>\n\n├ Status: Enabled\n├ Limit: 10 messages\n├ Time: 5 seconds\n└ Action: mute\n\nUse /setflood to change the limit.\nUse /setfloodmode to change the action.', { parse_mode: 'HTML' });
+
+            const flood = ctx.session.flood;
+            const status = flood.limit > 0 ? '✅ Enabled' : '❌ Disabled';
+
+            await ctx.reply(
+                `🌊 <b>Flood Settings</b>\n\n` +
+                `├ Status: ${status}\n` +
+                `├ Limit: ${flood.limit || 'Not set'} messages\n` +
+                `├ Time: ${flood.interval} seconds\n` +
+                `└ Action: ${flood.action}\n\n` +
+                `Use /setflood to change the limit.\n` +
+                `Use /setfloodmode to change the action.`, 
+                { parse_mode: 'HTML' }
+            );
         } catch (error) { console.error('flood error:', error); await ctx.reply('❌ An error occurred.'); }
     });
 };

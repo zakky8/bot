@@ -1,0 +1,8 @@
+node_modules
+logs
+*.log
+.env
+telegram-bot.zip
+dist
+build
+.DS_Store

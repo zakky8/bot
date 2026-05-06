@@ -23,3 +23,32 @@ export const escapeHtml = (text: string): string => {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 };
+
+export const sendLog = async (ctx: BotContext, message: string) => {
+  const logChannel = ctx.session.logChannel;
+  if (!logChannel) return;
+
+  try {
+    await ctx.api.sendMessage(logChannel, `📝 <b>Log Entry</b>\n\n${message}`, { parse_mode: 'HTML' });
+  } catch (e) {
+    console.error('Failed to send log:', e);
+  }
+};
+
+/**
+ * Sends a message and deletes it after a delay.
+ * Default delay is 30 seconds.
+ */
+export const tempReply = async (ctx: BotContext, text: string, delayMs: number = 30000, options: any = {}) => {
+  try {
+    const msg = await ctx.reply(text, { ...options, parse_mode: 'HTML' });
+    setTimeout(() => {
+      ctx.api.deleteMessage(ctx.chat!.id, msg.message_id).catch(() => {});
+      if (ctx.message) ctx.deleteMessage().catch(() => {});
+    }, delayMs);
+    return msg;
+  } catch (e) {
+    return ctx.reply(text, { ...options, parse_mode: 'HTML' });
+  }
+};
+

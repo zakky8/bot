@@ -6,9 +6,10 @@ export default (bot: Bot<BotContext>) => {
         try {
             if (!ctx.chat || ctx.chat.type === 'private') return ctx.reply('Groups only.');
             const admins = await ctx.getChatAdministrators();
-            if (!admins.some(a => a.user.id === ctx.from?.id)) return ctx.reply('❌ Admin only.');
+            if (!admins.some(a => a.user.id === ctx.from?.id)) return ctx.reply('❌ <b>Access Denied:</b> You need administrative privileges to use this command.', { parse_mode: 'HTML' }).then(msg => { setTimeout(() => { ctx.deleteMessage().catch(()=>{}); ctx.api.deleteMessage(ctx.chat!.id, msg.message_id).catch(()=>{}); }, 5000); });
             const rules = ctx.message?.text?.split(' ').slice(1).join(' ');
             if (!rules) return ctx.reply('Usage: /setrules <rules text>');
+            ctx.session.rules = rules;
             await ctx.reply(`✅ Rules updated!\n\n📜 <b>Preview:</b>\n${rules}`, { parse_mode: 'HTML' });
         } catch (error) { console.error('setrules error:', error); await ctx.reply('❌ An error occurred.'); }
     });
