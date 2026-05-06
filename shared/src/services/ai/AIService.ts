@@ -569,7 +569,7 @@ export class AIService {
     `;
 
     try {
-        const check = await this.generateWithAWS([{ role: 'user', content: verificationPrompt }], "You are a factual verification judge.", "anthropic.claude-3-haiku-20240307-v1:0");
+        const check = await this.generateWithAWS([{ role: 'user', content: verificationPrompt }], "You are a factual verification judge.", this.config.defaultModel);
         if (check.content.toUpperCase().includes('YES')) {
             this.logger.warn('Hallucination detected! Regenerating with stricter constraints...');
             response = await this.chat(context, userMessage, { ...options, systemPrompt: dynamicPrompt + "\nCRITICAL: Your previous answer was flagged as incorrect. Stick ONLY to the context." });
