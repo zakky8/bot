@@ -208,11 +208,15 @@ async function init() {
       process.once('SIGTERM', stopRunner);
     }
 
-    // Clear global and group scopes first to ensure the menu disappears from groups
+    // Clear default scope so no commands appear in unexpected contexts
     await bot.api.deleteMyCommands({ scope: { type: 'default' } }).catch(() => { });
-    await bot.api.deleteMyCommands({ scope: { type: 'all_group_chats' } }).catch(() => { });
 
-    // Register commands ONLY for Private Chats (DMs)
+    // Groups: only /ask visible to members
+    await bot.api.setMyCommands([
+      { command: 'ask', description: '🤖 Ask the AI assistant a question' },
+    ], { scope: { type: 'all_group_chats' } });
+
+    // Private chats (DMs): full command list
     await bot.api.setMyCommands([
       { command: 'start', description: 'Start the bot' },
       { command: 'help', description: 'Show help menu with all features' },
@@ -237,7 +241,7 @@ async function init() {
       { command: 'botadmins', description: 'List all Global Bot Admins (Owner Only)' },
     ], { scope: { type: 'all_private_chats' } });
 
-    logger.info('Command menu registered with Telegram (Private Chats Only)');
+    logger.info('Command menu registered (groups: /ask only | DMs: full list)');
 
     logger.info('Telegram bot started successfully');
   } catch (error) {
