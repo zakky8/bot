@@ -1,14 +1,12 @@
 import 'dotenv/config';
-import { Bot, session } from 'grammy';
+import { Bot, session, webhookCallback } from 'grammy';
 import { I18n } from '@grammyjs/i18n';
 import { RedisAdapter } from '@grammyjs/storage-redis';
 import Redis from 'ioredis';
 import { run } from '@grammyjs/runner';
 import { readdirSync, existsSync, statSync } from 'fs';
 import { join } from 'path';
-import { pathToFileURL } from 'url';
 import { autoRetry } from '@grammyjs/auto-retry';
-import { webhookCallback } from 'grammy';
 import { createServer } from 'http';
 import { createLogger } from './core/logger';
 import { connectDatabase } from './core/database';
@@ -82,7 +80,7 @@ bot.use(i18n);
 bot.use(loggingMiddleware);
 bot.use(userTrackerMiddleware);
 
-// Restriction: Only Bot Admins/Owners can use the bot in DMs
+// DMs are restricted to bot admins and owners only
 bot.on('message', async (ctx, next) => {
   if (ctx.chat?.type === 'private' && !isBotAdmin(ctx)) {
     return; // Silent ignore for non-admins in DM
@@ -218,8 +216,7 @@ async function init() {
     await bot.api.setMyCommands([
       { command: 'start', description: 'Start the bot' },
       { command: 'help', description: 'Show help menu with all features' },
-      { command: 'chat', description: 'Ask the AI assistant a question' },
-      { command: 'ask', description: 'Ask a question (alias for /chat)' },
+      { command: 'ask', description: 'Ask the AI assistant a question' },
       { command: 'support', description: 'Escalate to a human moderator' },
       { command: 'rules', description: 'View group rules' },
       { command: 'notes', description: 'List saved notes' },

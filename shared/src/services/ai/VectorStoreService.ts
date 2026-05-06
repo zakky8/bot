@@ -120,4 +120,8 @@ export class VectorStoreService {
         }
         this.docs = [];
     }
+
+    getDocCount(): number {
+        return this.docs.length;
+    }
 }
