@@ -1,0 +1,12 @@
+node_modules
+**/node_modules
+dist
+**/dist
+logs
+*.log
+.env
+.git
+.github
+temp-clone
+restored-bot
+storage
