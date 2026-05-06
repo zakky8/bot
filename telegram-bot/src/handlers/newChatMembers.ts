@@ -227,11 +227,9 @@ export default (bot: Bot<BotContext>) => {
                     .replace(/\{first\}/g, member.first_name)
                     .replace(/\{id\}/g, String(member.id));
                 const sent = await ctx.api.sendMessage(chatId, text, { parse_mode: 'HTML' }).catch(() => null);
-                // Auto-delete goodbye message after 30 seconds to keep the chat clean
+                // Delete goodbye message instantly to keep the chat clean
                 if (sent) {
-                    setTimeout(() => {
-                        ctx.api.deleteMessage(chatId, sent.message_id).catch(() => {});
-                    }, 30_000);
+                    await ctx.api.deleteMessage(chatId, sent.message_id).catch(() => {});
                 }
             }
         }
