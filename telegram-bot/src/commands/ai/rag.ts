@@ -7,6 +7,7 @@ import * as path from 'path';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 const pdf = require('pdf-parse');
+const mammoth = require('mammoth');
 
 // Advanced headers to mimic a real browser and bypass aggressive bot detection (like Medium)
 const SCRAPER_CONFIG = {
@@ -53,6 +54,9 @@ export default (bot: Bot<BotContext>) => {
         if (reply.document.file_name?.endsWith('.pdf')) {
             const data = await pdf(response.data);
             content = data.text;
+        } else if (reply.document.file_name?.endsWith('.docx')) {
+            const result = await mammoth.extractRawText({ buffer: response.data });
+            content = result.value;
         } else {
             content = Buffer.from(response.data).toString('utf-8');
         }
