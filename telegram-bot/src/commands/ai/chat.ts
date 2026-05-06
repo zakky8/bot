@@ -3,9 +3,8 @@ import { BotContext } from '../../types';
 import { aiService } from '../../core/ai';
 import { isBotAdmin } from '../../utils/permissions';
 
-// ── Layer 4: Output guard — only catches explicit identity confessions ────────
-// Does NOT trigger on mentions of model names in legitimate project context.
-// Only fires if the bot directly admits it IS a specific external model.
+// ── Layer 4: Output guard — identity confessions + wrong links ────────────────
+
 const EXPLICIT_CONFESSION_PATTERNS = [
   /I am (gpt|chatgpt|claude|gemini|llama|mistral|openai|anthropic)/i,
   /I'?m (gpt|chatgpt|claude|gemini|llama|mistral)/i,
@@ -15,12 +14,29 @@ const EXPLICIT_CONFESSION_PATTERNS = [
   /my (training|knowledge) cutoff (is|was)/i,
 ];
 
+// Wrong/outdated links that must never appear in responses.
+// Maps pattern → correct replacement URL (or null to strip the whole URL).
+const BANNED_LINK_REPLACEMENTS: Array<[RegExp, string]> = [
+  // Old docs site (any path under docs.astarter.io)
+  [/https?:\/\/docs\.astarter\.io\S*/gi, 'https://astarter.gitbook.io/astarter'],
+  // Wrong gitbook path variant
+  [/https?:\/\/astarter\.gitbook\.io\/en\S*/gi, 'https://astarter.gitbook.io/astarter'],
+  // Old wrong announcement link (lowercase 'a')
+  [/https?:\/\/t\.me\/astarteranncmnt(?!\w)/gi, 'https://t.me/Astarteranncmnt'],
+];
+
 function filterOutput(response: string): string {
+  // 1. Identity confession guard
   if (EXPLICIT_CONFESSION_PATTERNS.some(p => p.test(response))) {
-    console.warn('[OutputGuard] Explicit identity confession caught — regenerating.');
+    console.warn('[OutputGuard] Explicit identity confession caught — replacing.');
     return `I'm ${process.env.BOT_NAME || 'your Astarter assistant'}! What can I help you with today? 😊`;
   }
-  return response;
+  // 2. Replace banned/wrong links with correct ones
+  let text = response;
+  for (const [pattern, replacement] of BANNED_LINK_REPLACEMENTS) {
+    text = text.replace(pattern, replacement);
+  }
+  return text;
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -112,7 +128,12 @@ export default (bot: Bot<BotContext>) => {
       text = text.replace(/\n{3,}/g, '\n\n').trim();
       // ─────────────────────────────────────────────────────────────────────────
 
-      if (!text.includes(username)) {
+      // Always prepend correct username in group chats.
+      // This fixes cases where AI picks up a different name from RAG context.
+      if (isGroup) {
+        // Strip any wrongly-prepended @handle that isn't the current user
+        // (AI may have addressed someone from the RAG history)
+        text = text.replace(/^@\w+\n/, '');
         text = `${username}\n${text}`;
       }
 
