@@ -139,13 +139,8 @@ export default (bot: Bot<BotContext>) => {
   // Remove auto-chat logic. AI now only responds via /ask command.
   
   bot.command('ask', async (ctx) => {
-    // 1. Restriction: Only Bot Admins and Owner can use this
-    if (!isBotAdmin(ctx)) {
-        // If in DM, completely ignore non-admins/non-owners
-        if (ctx.chat.type === 'private') return;
-        // In groups, you might want to show a message or just ignore
-        return; 
-    }
+    // DMs: restricted to bot admins / owner only
+    if (ctx.chat?.type === 'private' && !isBotAdmin(ctx)) return;
 
     const message = (ctx.match as string)?.trim();
     if (!message) {
