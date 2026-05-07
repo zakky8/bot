@@ -31,6 +31,20 @@ export class VectorStoreService {
                 const data = fs.readFileSync(this.storagePath, 'utf-8');
                 this.docs = JSON.parse(data);
                 console.log(`Loaded ${this.docs.length} vectors from storage (AWS Bedrock).`);
+
+                // ── Auto-migrate: fix old type values so /adddoc docs are retrievable ──
+                const OLD_TYPES = new Set(['file', 'url', 'text']);
+                let migrated = 0;
+                for (const doc of this.docs) {
+                    if (doc.metadata?.type && OLD_TYPES.has(doc.metadata.type)) {
+                        doc.metadata.type = 'manual';
+                        migrated++;
+                    }
+                }
+                if (migrated > 0) {
+                    fs.writeFileSync(this.storagePath, JSON.stringify(this.docs, null, 2));
+                    console.log(`Auto-migrated ${migrated} docs from old type → 'manual'`);
+                }
             } catch (err) {
                 console.error('Failed to load vector data:', err);
             }
@@ -112,7 +126,17 @@ export class VectorStoreService {
                 ? this.docs.filter(d => typeFilter.includes(d.metadata?.type ?? ''))
                 : this.docs;
 
-            if (pool.length === 0) return [];
+            if (pool.length === 0) {
+                // Debug: log what types actually exist so we can spot mismatches
+                const types = new Map<string, number>();
+                for (const d of this.docs) {
+                    const t = d.metadata?.type ?? '(none)';
+                    types.set(t, (types.get(t) ?? 0) + 1);
+                }
+                const summary = [...types.entries()].map(([t, c]) => `${t}:${c}`).join(', ');
+                console.log(`searchFiltered: 0 docs matched filter [${typeFilter?.join(',')}]. Existing types: ${summary}`);
+                return [];
+            }
 
             const scored = pool.map(doc => ({
                 ...doc,
