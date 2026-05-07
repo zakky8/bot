@@ -303,6 +303,24 @@ ${faqBlock ? `Here's your reference knowledge. You know all of this, but NEVER d
 
 If you genuinely don't have the info: say so simply — "Hmm, I don't have that detail handy — you might want to reach out to the support team or ask in the community!" Do NOT append any link unless the user asked for one.
 
+# Grounding Examples — follow this pattern exactly
+
+Example 1 — question answered by knowledge:
+User: "what is ABox"
+Answer: "ABox is Astarter's plug-and-play AI node hardware — you run it to join the network and earn revenue sharing. Want to know about the node tiers?"
+
+Example 2 — question NOT in knowledge base:
+User: "what blockchains will Astarter support"
+Answer: "I don't have the confirmed details on that yet — keep an eye on the announcements channel for official news."
+
+Example 3 — unclear/misspelled question:
+User: "tell me about bous"
+Answer: "Could you clarify what you mean? Did you mean ABox (the hardware node), or something else?"
+
+Example 4 — user asks for more:
+User: "yes give more data"
+Answer: Give ONE additional fact (2-3 sentences max), not a full dump of everything.
+
 ZERO TOLERANCE FOR FABRICATION: Never make up token prices, dates, percentages, wallet addresses, technical specs, partnerships, blockchain integrations, or revenue sharing numbers. If the data is not in your Knowledge section or the Context below, it does not exist. Say "I don't have that specific detail" — NEVER fill gaps with guesses. Never give financial or investment advice.
 
 # Official Links
@@ -515,8 +533,11 @@ LANGUAGE RULE: Detect the language from the current user's message and reply ent
             content: [{ text: m.content }]
           })),
           inferenceConfig: {
-            maxTokens: this.config.maxTokens || 1024,
-            temperature: this.config.temperature || 0.7,
+            maxTokens: this.config.maxTokens || 800,
+            // Low temperature (0.1) = factual, grounded answers, far less hallucination.
+            // topP (0.5) = restricts to top 50% likely tokens, prevents creative drift.
+            temperature: 0.1,
+            topP: 0.5,
           }
         });
 
@@ -624,13 +645,26 @@ LANGUAGE RULE: Detect the language from the current user's message and reply ent
         // each type separately, always show deck knowledge first, only include history when
         // deck has fewer than 2 hits (i.e. question is community/sentiment, not product).
 
+        // Confidence threshold: only use chunks with cosine similarity ≥ 0.45
+        // Below this score the chunk is weakly related and more likely to mislead than help.
+        const MIN_SCORE = 0.45;
+
         // Pass 1: current project knowledge
-        const deckHits = await this.vectorStore.searchFiltered(ragQuery, 3, ['astarter_deck', 'manual']);
+        const deckRaw = await this.vectorStore.searchFiltered(ragQuery, 3, ['astarter_deck', 'manual']);
+        const deckHits = deckRaw.filter(h => h.score >= MIN_SCORE);
 
         // Pass 2: community chat — only when deck is sparse
-        const histHits = deckHits.length < 2
+        const histRaw = deckHits.length < 2
             ? await this.vectorStore.searchFiltered(ragQuery, 2, ['telegram_history'])
             : [];
+        const histHits = histRaw.filter(h => h.score >= MIN_SCORE);
+
+        if (deckRaw.length !== deckHits.length || histRaw.length !== histHits.length) {
+            this.logger.info(
+                `RAG confidence filter: deck ${deckRaw.length}→${deckHits.length}, ` +
+                `hist ${histRaw.length}→${histHits.length} (threshold ${MIN_SCORE})`
+            );
+        }
 
         const parts: string[] = [];
         if (deckHits.length > 0) {
