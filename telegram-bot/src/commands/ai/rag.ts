@@ -159,7 +159,7 @@ export default (bot: Bot<BotContext>) => {
         }
 
         await ctx.reply(`⚙️ Indexing ${content.length.toLocaleString()} characters…`);
-        await aiService.addDocument(content, { source: fileName, type: 'file', ext });
+        await aiService.addDocument(content, { source: fileName, type: 'manual', ext });
         return ctx.reply(`✅ <b>${fileName}</b> indexed successfully! (${content.length.toLocaleString()} chars)`, {
           parse_mode: 'HTML',
         });
@@ -201,7 +201,7 @@ export default (bot: Bot<BotContext>) => {
         await ctx.reply(`⚙️ Indexing ${content.length.toLocaleString()} characters…`);
         await aiService.addDocument(content, {
           source: inputText,
-          type: 'url',
+          type: 'manual',
           date: new Date().toISOString(),
           added_by: ctx.from?.id,
         });
@@ -225,7 +225,7 @@ export default (bot: Bot<BotContext>) => {
     }
     try {
       await aiService.addDocument(inputText, {
-        type: 'text',
+        type: 'manual',
         date: new Date().toISOString(),
         added_by: ctx.from?.id,
       });
