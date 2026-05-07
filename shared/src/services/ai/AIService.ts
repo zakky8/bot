@@ -467,9 +467,20 @@ LANGUAGE RULE: Detect the language from the current user's message and reply ent
   ): Promise<AIResponse> {
     if (!this.bedrock) throw new Error('AWS Bedrock not initialised');
 
-    let modelToUse = model ?? this.config.defaultModel;
-    if (!modelToUse.includes('.')) {
-        modelToUse = 'anthropic.claude-3-haiku-20240307-v1:0';
+    let modelToUse = model ?? this.config.defaultModel ?? 'anthropic.claude-3-haiku-20240307-v1:0';
+
+    // AWS Bedrock cross-region inference: EU and AP regions require a regional prefix.
+    // Strip any existing prefix first, then re-apply the correct one for the region.
+    const region = this.config.awsRegion ?? 'us-east-1';
+    // Remove existing prefix if present (e.g. eu., us., ap.)
+    const bareModel = modelToUse.replace(/^(eu|us|ap)\./, '');
+    if (region.startsWith('eu-')) {
+      modelToUse = `eu.${bareModel}`;
+    } else if (region.startsWith('ap-')) {
+      modelToUse = `ap.${bareModel}`;
+    } else {
+      // us-east-1, us-west-2 etc — use us. prefix for cross-region inference
+      modelToUse = `us.${bareModel}`;
     }
 
     // Sanitise messages before sending — Bedrock requires strict alternation
