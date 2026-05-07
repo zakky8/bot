@@ -1,7 +1,7 @@
 import { Bot } from 'grammy';
 import { BotContext } from '../../types';
 import { aiService } from '../../core/ai';
-import { isBotAdmin } from '../../utils/permissions';
+import { isAdminOrOwner } from '../../utils/permissions';
 
 // ── Layer 4: Output guard — identity confessions + wrong links ────────────────
 
@@ -199,8 +199,8 @@ export default (bot: Bot<BotContext>) => {
   // Remove auto-chat logic. AI now only responds via /ask command.
   
   bot.command('ask', async (ctx) => {
-    // DMs: restricted to bot admins / owner only
-    if (ctx.chat?.type === 'private' && !isBotAdmin(ctx)) return;
+    // DMs: auth middleware already guards this — but double-check for safety
+    if (ctx.chat?.type === 'private' && !(await isAdminOrOwner(ctx))) return;
 
     const message = (ctx.match as string)?.trim();
     if (!message) {

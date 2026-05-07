@@ -84,13 +84,7 @@ bot.use(i18n);
 bot.use(loggingMiddleware);
 bot.use(userTrackerMiddleware);
 
-// DMs are restricted to bot admins and owners only
-bot.on('message', async (ctx, next) => {
-  if (ctx.chat?.type === 'private' && !isBotAdmin(ctx)) {
-    return; // Silent ignore for non-admins in DM
-  }
-  return next();
-});
+// Auth middleware handles DM access control — no pre-filter needed here
 
 bot.use(authMiddleware);
 bot.use(locksMiddleware);

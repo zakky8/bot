@@ -1,14 +1,20 @@
 import { NextFunction } from 'grammy';
 import { BotContext } from '../types';
-import { isBotAdmin } from '../utils/permissions';
+import { isAdminOrOwner } from '../utils/permissions';
 
 export const authMiddleware = async (ctx: BotContext, next: NextFunction) => {
-  // Layer 2a — DM block: only bot admins/owners may use DMs
-  if (ctx.chat?.type === 'private' && !isBotAdmin(ctx)) {
-    await ctx.reply('I only operate in the project group. Please ask your question there.');
-    return;
+  // In DMs: allow bot admins, the owner, AND group admins connected via /connect
+  if (ctx.chat?.type === 'private') {
+    const allowed = await isAdminOrOwner(ctx);
+    if (!allowed) {
+      await ctx.reply(
+        '⚠️ I only work inside the project group.\n' +
+        'Ask your question there with <code>/ask</code>, or connect as an admin with <code>/connect &lt;groupId&gt;</code>.',
+        { parse_mode: 'HTML' }
+      );
+      return;
+    }
   }
 
-  // Note: media is NOT dropped here — locks middleware handles content enforcement.
   await next();
 };
