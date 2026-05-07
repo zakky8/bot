@@ -252,7 +252,7 @@ export class AIService {
     // ── TRINITY persona — ElevenLabs-style, natural knowledge blending ────────
     const OFFICIAL_LINKS = `
 OFFICIAL ASTARTER LINKS (always use these exact URLs, never others):
-• Website: https://www.astarter.ai
+• Website: https://www.astarter.io
 • Telegram Community: https://t.me/AstarterDefiHubOfficial
 • Telegram Announcements: https://t.me/Astarteranncmnt
 • Twitter/X: https://x.com/AstarterDefiHub
