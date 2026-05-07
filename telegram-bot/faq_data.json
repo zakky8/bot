@@ -1,31 +1,31 @@
 [
   {
     "q": "What is Astarter?",
-    "a": "Astarter is Infrastructure for the Autonomous AI Economy — a decentralized Web4 project combining DePIN infrastructure with on-chain execution. It enables autonomous AI agents to operate, coordinate, and create real economic value. Three pillars: (1) Decentralized AI Agent Network — user-owned agents anyone can deploy. (2) On-Chain Execution Layer — AI agents execute trades and strategies on-chain. (3) ABox + DePIN Node Network — hardware nodes providing compute, execution, and revenue sharing. Backed by OKX Ventures and EMURGO."
+    "a": "Astarter is Infrastructure for the Autonomous AI Economy — a decentralized Web4 project combining DePIN infrastructure with on-chain execution. It enables autonomous AI agents to operate, coordinate, and create real economic value, laying the foundation for a global AI agent economy.\n\nThree core pillars:\n• Decentralized AI Agent Network — user-owned agents anyone can deploy\n• On-Chain Execution Layer — AI agents execute trades and strategies on-chain\n• ABox + DePIN Node Network — hardware nodes providing compute, execution, and revenue sharing\n\nBacked by OKX Ventures and EMURGO."
   },
   {
     "q": "What problem does Astarter solve?",
-    "a": "Astarter solves three core problems: (1) AI is centralized — a few companies control AI; users cannot own, deploy, or monetize it. (2) DePIN lacks an AI coordination layer — existing networks provide compute but no AI-native application layer. (3) AI is not natively economic on-chain — AI cannot autonomously execute trades; blockchains lack intelligent execution actors. Astarter fixes all three."
+    "a": "Astarter solves three core problems:\n• AI is centralized — a few companies control AI; users cannot own, deploy, or monetize it\n• DePIN lacks an AI coordination layer — existing networks provide compute but no AI-native application layer\n• AI is not natively economic on-chain — AI cannot autonomously execute trades; blockchains lack intelligent execution actors\n\nAstarter fixes all three by combining DePIN infrastructure with autonomous on-chain AI agents."
   },
   {
     "q": "What is ABox?",
-    "a": "ABox is Astarter's core AI node device — plug-and-play hardware that lets anyone run AI agents and join the global AI economy. Key features: Open Protocol via OpenClaw (compatible with LangChain, AutoGPT, and major frameworks), On-chain Execution (built-in engine for smart contract calls and DeFi trades), Multi-Agent Runtime (multiple AI agents running in parallel), and Plug-and-Play setup (connects to Astarter network out of the box)."
+    "a": "ABox is Astarter's core AI node device — plug-and-play hardware that lets anyone run AI agents and join the global AI economy.\n\nKey features:\n• Open Protocol via OpenClaw — compatible with LangChain, AutoGPT, and major agent frameworks\n• On-Chain Execution — built-in engine for smart contract calls and DeFi trades\n• Multi-Agent Runtime — multiple AI agents running in parallel\n• Plug-and-Play — connects to Astarter network out of the box"
   },
   {
     "q": "What are the ABox node tiers, prices, and how do I earn?",
-    "a": "ABox nodes come in three tiers (all include revenue sharing + presale whitelist):\n• LITE — $500 | 1,333 tokens | 12,000 slots\n• PRO — $1,000 | 2,900 tokens | 4,137 slots\n• MAX — $3,000 | 10,500 tokens | 1,142 slots\n\nRevenue streams for all node operators: AI agent execution fees, ABox compute rewards, Agent Marketplace revenue, AI DEX trading fees, Prediction Market fees. Higher tier = more tokens = larger share of network revenue."
+    "a": "ABox nodes come in three tiers (all include revenue sharing + presale whitelist):\n• LITE — $500 | 1,333 tokens | 12,000 slots\n• PRO — $1,000 | 2,900 tokens | 4,137 slots\n• MAX — $3,000 | 10,500 tokens | 1,142 slots\n\nRevenue streams for all node operators:\n• AI agent execution fees\n• ABox compute rewards\n• Agent Marketplace revenue\n• AI DEX trading fees\n• Prediction Market fees\n\nHigher tier = more tokens = larger share of network revenue."
   },
   {
     "q": "What is Astarter's four-layer architecture?",
-    "a": "Astarter uses a Four-Layer AI Economy Architecture:\n• Layer 1 — Infrastructure: High-performance blockchain with AI-native execution environment.\n• Layer 2 — Node Layer (ABox): DePIN nodes provide compute, run AI agents, share in network revenue.\n• Layer 3 — Agent Layer (CORE): Autonomous AI agents executing trades, strategies, and predictions.\n• Layer 4 — Application Layer: AI DEX, Prediction Market, Data Market, Agent App Store."
+    "a": "Astarter uses a Four-Layer AI Economy Architecture:\n• Layer 1 — Infrastructure: High-performance blockchain with AI-native execution environment\n• Layer 2 — Node Layer (ABox): DePIN nodes provide compute, run AI agents, share in network revenue\n• Layer 3 — Agent Layer (CORE): Autonomous AI agents executing trades, strategies, and predictions\n• Layer 4 — Application Layer: AI DEX, Prediction Market, Data Market, Agent App Store"
   },
   {
     "q": "What are Astarter's use cases?",
-    "a": "Astarter's AI Agent-powered applications:\n• AI DEX — AI agents execute trading, market-making, and arbitrage to improve on-chain liquidity.\n• Prediction Market — Agents analyze on-chain and external data for accurate predictions.\n• Data Market — Agents generate, process, and trade data in a decentralized data network.\n• Agent Marketplace (App Store) — Buy, deploy, or rent AI agents; developers monetize their agents."
+    "a": "Astarter's AI Agent-powered applications:\n• AI DEX — AI agents execute trading, market-making, and arbitrage to improve on-chain liquidity\n• Prediction Market — Agents analyze on-chain and external data for accurate predictions\n• Data Market — Agents generate, process, and trade data in a decentralized data network\n• Agent Marketplace (App Store) — Buy, deploy, or rent AI agents; developers monetize their agents"
   },
   {
     "q": "What is the on-chain economic flywheel?",
-    "a": "Astarter's economic flywheel: Applications (DEX, prediction markets, data markets) send tasks to AI Agents → Agents execute and generate revenue → Revenue incentivizes ABox Nodes → Nodes provide more compute and execution capacity → supports more agents and larger demand → self-reinforcing growth cycle."
+    "a": "Astarter's economic flywheel:\n• Applications (DEX, prediction markets, data markets) send tasks to AI Agents\n• Agents execute and generate revenue\n• Revenue incentivizes ABox Nodes\n• Nodes provide more compute and execution capacity\n• Supports more agents and larger demand → self-reinforcing growth cycle"
   },
   {
     "q": "What is CORE and OpenClaw?",
@@ -33,22 +33,26 @@
   },
   {
     "q": "What is Astarter's tokenomics?",
-    "a": "Total supply: 1,000,000,000 (1 billion tokens).\nAllocation:\n• Ecosystem & Community: 42% — incentives, marketing, ecosystem rewards\n• Ecosystem Development: 38% — Staking Mining: 250,000 tokens/day, 10% reduction every 6 months\n• Market Cap Management: 10%\n• R&D: 5%\n• Node Airdrop: 4%\n• Community Incentives: 1%\nTeam and investors: 1-year cliff + 4-year linear vesting."
+    "a": "Total supply: 1,000,000,000 (1 billion tokens).\n\nAllocation:\n• Ecosystem & Community: 42% — incentives, marketing, ecosystem rewards\n• Ecosystem Development: 38%\n• Market Cap Management: 10%\n• R&D: 5%\n• Node Airdrop: 4%\n• Community Incentives: 1%\n\nStaking Mining: 250,000 tokens/day, 10% reduction every 6 months.\n\nVesting: Team and investors have a 1-year cliff + 4-year linear vesting."
+  },
+  {
+    "q": "When is the TGE? When is the token launch?",
+    "a": "The exact TGE (Token Generation Event) date has not been officially announced yet. Based on the roadmap, the Mainnet launch — which coincides with TGE — is planned for 2026 Q2–Q3.\n\nFor the latest official updates, follow our channels: https://linktr.ee/Astarter"
   },
   {
     "q": "What is Astarter's roadmap?",
-    "a": "Astarter roadmap:\n• 2025 Q3–Q4: ABox node deployment launch, Testnet launch\n• 2026 Q2–Q3: Mainnet launch, Astarter Grant program, native AI agent ↔ DePIN node interaction\n• 2026 Q4: ABox Agent App Store launch, major blockchain integrations, more compute nodes\n• 2027+: Automated agent-to-agent execution, next-generation Web4 agent economy"
+    "a": "Astarter roadmap:\n• 2025 Q3–Q4: ABox node deployment launch, Testnet launch\n• 2026 Q2–Q3: Mainnet launch + TGE, Astarter Grant program, native AI agent ↔ DePIN node interaction\n• 2026 Q4: ABox Agent App Store launch, major blockchain integrations, more compute nodes\n• 2027+: Automated agent-to-agent execution, next-generation Web4 agent economy"
   },
   {
     "q": "Who owns Astarter? Who is behind Astarter? Who is the team?",
-    "a": "Astarter isn't owned by one person — it's a community-driven project backed by leading crypto investors like OKX Ventures and EMURGO. The team is led by experienced founders and advisors (Sergio Sanchez, John O'Connor, Darren Camas), but ownership is distributed across the ecosystem and token holders. Follow all official links at https://linktr.ee/Astarter"
+    "a": "Astarter is a community-driven project — not owned by one person. It is backed by leading crypto investors including OKX Ventures and EMURGO.\n\nAdvisors:\n• Sergio Sanchez — Head of Product at EMURGO (Yoroi Wallet)\n• John O'Connor — Director of African Operations at IOHK/Cardano\n• Darren Camas — CEO of IPOR Labs\n\nOwnership is distributed across the ecosystem and token holders. Follow all official channels: https://linktr.ee/Astarter"
   },
   {
     "q": "Who are Astarter's investors and advisors?",
-    "a": "Lead investors: OKX Ventures and EMURGO.\nOther investors: Adaverse, MH Ventures, Avatar Capital, 316VC, CRT Capital, Megala Ventures.\n\nAdvisors:\n• Sergio Sanchez — Head of Product at EMURGO (Yoroi Wallet)\n• John O'Connor — Director of African Operations at IOHK/Cardano\n• Darren Camas — CEO of IPOR Labs\n\nOwnership is distributed across the ecosystem and token holders — Astarter is community-driven."
+    "a": "Lead investors: OKX Ventures and EMURGO.\n\nOther investors: Adaverse, MH Ventures, Avatar Capital, 316VC, CRT Capital, Megala Ventures.\n\nAdvisors:\n• Sergio Sanchez — Head of Product at EMURGO (Yoroi Wallet)\n• John O'Connor — Director of African Operations at IOHK/Cardano\n• Darren Camas — CEO of IPOR Labs\n\nOwnership is distributed across the ecosystem and token holders — Astarter is community-driven."
   },
   {
     "q": "Where can I find official Astarter links and social media?",
-    "a": "Official Astarter links:\n• Website: https://www.astarter.io/\n• Telegram Community: https://t.me/AstarterDefiHubOfficial\n• Telegram Announcements: https://t.me/Astarteranncmnt\n• Twitter/X: https://x.com/AstarterDefiHub\n• Discord: https://discord.gg/XXDEjFPrgR\n• Medium: https://medium.com/@AstarterDefiHub\n• Reddit: https://www.reddit.com/r/Astarter/\n• YouTube: https://youtube.com/c/astartertv\n• Zealy: https://zealy.io/cw/astarterdefihub/leaderboard\n• All links: https://linktr.ee/Astarter\n• Email: contact@astarter.io"
+    "a": "All official Astarter links: https://linktr.ee/Astarter\n\n• Website: https://www.astarter.ai\n• Telegram Community: https://t.me/AstarterDefiHubOfficial\n• Telegram Announcements: https://t.me/Astarteranncmnt\n• Twitter/X: https://x.com/AstarterDefiHub\n• Discord: https://discord.gg/XXDEjFPrgR\n• Medium: https://medium.com/@AstarterDefiHub\n• Email: contact@astarter.ai"
   }
 ]

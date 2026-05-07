@@ -113,6 +113,10 @@ export default (bot: Bot<BotContext>) => {
       text = text.replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, '<b>$1</b>');
       text = text.replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, '<i>$1</i>');
 
+      // 6a. Rescue angle-bracket URLs like <https://...> before the tag stripper deletes them.
+      //     Some AI models output <URL> as a plain-link shorthand — we convert to plain text URL.
+      text = text.replace(/<(https?:\/\/[^>]+)>/g, '$1');
+
       // 6. Strip any remaining unsupported tags (keep allowed ones)
       const ALLOWED = ['b', 'i', 'u', 's', 'a', 'code', 'pre', 'tg-spoiler'];
       const stripPattern = new RegExp(
