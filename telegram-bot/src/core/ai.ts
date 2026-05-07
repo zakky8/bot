@@ -22,7 +22,7 @@ function createAIService() {
         awsSecretKey:     process.env.AWS_SECRET_KEY            || '',
         awsRegion:        process.env.AWS_REGION                || 'us-east-1',
         ollamaHost:       process.env.AI_BASE_URL               || 'http://localhost:11434',
-        defaultModel:     process.env.AI_MODEL                  || 'anthropic.claude-3-haiku-20240307-v1:0',
+        defaultModel:     process.env.AI_MODEL                  || 'amazon.nova-lite-v1:0',
         fallbackModel:    process.env.AI_FALLBACK_MODEL         || 'llama3.2:3b',
         botName:          process.env.BOT_NAME                  || 'SupportBot',
         escalationUserId: process.env.HUMAN_MODERATOR_CHAT_ID  || '',
