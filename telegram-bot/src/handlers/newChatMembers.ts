@@ -73,28 +73,7 @@ export default (bot: Bot<BotContext>) => {
             // Cancel any stale captcha (user left and rejoined before timeout)
             cancelPendingCaptcha(chatId, member.id);
 
-            // ── Federation ban check ──────────────────────────────────────────
-            const currentFedId = ctx.session.federations?.current;
-            if (currentFedId) {
-                try {
-                    const { query } = require('../core/database');
-                    const fban = await query(
-                        'SELECT reason FROM federation_bans WHERE federation_id = $1 AND user_id = $2',
-                        [currentFedId, member.id]
-                    );
-                    if ((fban.rowCount ?? 0) > 0) {
-                        await ctx.api.banChatMember(chatId, member.id);
-                        await ctx.api.sendMessage(chatId,
-                            `🚫 <b>F-Banned User Detected</b>\n\nThis user is globally banned in this federation.\n└ <b>Reason:</b> ${fban.rows[0].reason}`,
-                            { parse_mode: 'HTML' }
-                        );
-                        await sendLog(ctx,
-                            `🛡️ <b>FBan Enforcement</b>\n├ User: ${member.first_name}\n└ Status: Banned (Federation DB)`
-                        );
-                        continue;
-                    }
-                } catch (e) { logger.error('FBan check error:', e); }
-            }
+            // Federation ban check skipped — requires PostgreSQL (not configured)
 
             // ── Anti-Raid check ───────────────────────────────────────────────
             if (!ctx.session.antiraid) ctx.session.antiraid = { enabled: false, recentJoins: [] };
