@@ -15,12 +15,11 @@ const EXPLICIT_CONFESSION_PATTERNS = [
 ];
 
 // Wrong/outdated links that must never appear in responses.
-// Maps pattern → correct replacement URL (or null to strip the whole URL).
+// Maps pattern → correct replacement URL.
 const BANNED_LINK_REPLACEMENTS: Array<[RegExp, string]> = [
-  // Old docs site (any path under docs.astarter.io)
-  [/https?:\/\/docs\.astarter\.io\S*/gi, 'https://astarter.gitbook.io/astarter'],
-  // Wrong gitbook path variant
-  [/https?:\/\/astarter\.gitbook\.io\/en\S*/gi, 'https://astarter.gitbook.io/astarter'],
+  // Any gitbook URL (old docs site or gitbook path) → Linktree
+  [/https?:\/\/docs\.astarter\.io\S*/gi, 'https://linktr.ee/Astarter'],
+  [/https?:\/\/astarter\.gitbook\.io\S*/gi, 'https://linktr.ee/Astarter'],
   // Old wrong announcement link (lowercase 'a')
   [/https?:\/\/t\.me\/astarteranncmnt(?!\w)/gi, 'https://t.me/Astarteranncmnt'],
 ];
@@ -129,7 +128,7 @@ export default (bot: Bot<BotContext>) => {
 
       // 9. Fix dangling "check the docs:" / "see the docs:" with no URL following.
       //    This catches cases where the AI ends a sentence with a colon and no link.
-      const DOCS_URL     = 'https://astarter.gitbook.io/astarter';
+      const DOCS_URL     = 'https://linktr.ee/Astarter';
       const LINKTREE_URL = 'https://linktr.ee/Astarter';
       text = text.replace(
         /\b(check(?: out)?|see|visit|view)(?: the)? docs?:?\s*$/gim,
