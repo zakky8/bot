@@ -3,9 +3,11 @@ import { BotContext } from '../../types';
 
 export default (bot: Bot<BotContext>) => {
     bot.command('delfed', async (ctx: BotContext) => {
-        try {
-            if (!ctx.chat) return;
-            await ctx.reply('⚠️ Are you sure you want to delete your federation? This action is irreversible. Send /confirm to proceed.');
-        } catch (error) { console.error('delfed error:', error); await ctx.reply('❌ An error occurred.'); }
+        await ctx.reply(
+            '⚠️ <b>Federation feature unavailable</b>\n\n' +
+            'Federations require a PostgreSQL database which is not currently configured.\n' +
+            'Contact the bot administrator to set up the database.',
+            { parse_mode: 'HTML' }
+        );
     });
 };

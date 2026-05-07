@@ -3,12 +3,12 @@ import { BotContext } from '../../types';
 
 export default (bot: Bot<BotContext>) => {
     bot.command('leavefed', async (ctx: BotContext) => {
-        try {
-            if (!ctx.chat || ctx.chat.type === 'private') return ctx.reply('Groups only.');
-            const admins = await ctx.getChatAdministrators();
-            if (!admins.some(a => a.user.id === ctx.from?.id)) return ctx.reply('❌ <b>Access Denied:</b> You need administrative privileges to use this command.', { parse_mode: 'HTML' }).then(msg => { setTimeout(() => { ctx.deleteMessage().catch(()=>{}); ctx.api.deleteMessage(ctx.chat!.id, msg.message_id).catch(()=>{}); }, 5000); });
-            await ctx.reply('✅ This group has left the federation.');
-        } catch (error) { console.error('leavefed error:', error); await ctx.reply('❌ An error occurred.'); }
+        await ctx.reply(
+            '⚠️ <b>Federation feature unavailable</b>\n\n' +
+            'Federations require a PostgreSQL database which is not currently configured.\n' +
+            'Contact the bot administrator to set up the database.',
+            { parse_mode: 'HTML' }
+        );
     });
 };
 

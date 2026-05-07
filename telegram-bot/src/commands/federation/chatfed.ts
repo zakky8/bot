@@ -3,9 +3,11 @@ import { BotContext } from '../../types';
 
 export default (bot: Bot<BotContext>) => {
     bot.command('chatfed', async (ctx: BotContext) => {
-        try {
-            if (!ctx.chat || ctx.chat.type === 'private') return ctx.reply('Groups only.');
-            await ctx.reply('🌐 This chat is not connected to any federation.\nUse /joinfed <id> to join one.');
-        } catch (error) { console.error('chatfed error:', error); await ctx.reply('❌ An error occurred.'); }
+        await ctx.reply(
+            '⚠️ <b>Federation feature unavailable</b>\n\n' +
+            'Federations require a PostgreSQL database which is not currently configured.\n' +
+            'Contact the bot administrator to set up the database.',
+            { parse_mode: 'HTML' }
+        );
     });
 };

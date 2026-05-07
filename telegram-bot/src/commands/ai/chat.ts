@@ -149,7 +149,19 @@ export default (bot: Bot<BotContext>) => {
       };
 
       if (text.length > 4000) {
-        const chunks = text.match(/.{1,4000}/gs) || [text];
+        // Split at newlines to avoid cutting mid HTML-tag or mid-word
+        const chunks: string[] = [];
+        let current = '';
+        for (const line of text.split('\n')) {
+          const next = current ? current + '\n' + line : line;
+          if (next.length > 3900) {
+            if (current) chunks.push(current.trim());
+            current = line;
+          } else {
+            current = next;
+          }
+        }
+        if (current.trim()) chunks.push(current.trim());
         for (const chunk of chunks) {
           await ctx.reply(chunk, replyOpts);
         }
