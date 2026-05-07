@@ -130,26 +130,7 @@ export default (bot: Bot<BotContext>) => {
       // 8. Convert Markdown italic _text_ → <i>text</i>
       text = text.replace(/(?<![_\w])_(.*?)_(?![_\w])/g, '<i>$1</i>');
 
-      // 9. Fix dangling "check the docs:" / "see the docs:" with no URL following.
-      //    This catches cases where the AI ends a sentence with a colon and no link.
-      const DOCS_URL     = 'https://linktr.ee/Astarter';
-      const LINKTREE_URL = 'https://linktr.ee/Astarter';
-      text = text.replace(
-        /\b(check(?: out)?|see|visit|view)(?: the)? docs?:?\s*$/gim,
-        `$1 the docs: ${DOCS_URL}`
-      );
-      // Also fix bare "documentation:" or "documentation." at end of line with no URL
-      text = text.replace(
-        /\bdocumentation[.:]\s*$/gim,
-        `documentation: ${DOCS_URL}`
-      );
-      // Fix dangling "stay updated" / "follow us" / "our channels" with no URL
-      text = text.replace(
-        /\b(stay updated|follow (?:us|our channels?|our socials?)|keep up|all our channels?)[.:,]?\s*$/gim,
-        `$1 — follow us at ${LINKTREE_URL}`
-      );
-
-      // 10. Clean up excess blank lines (max 2 consecutive newlines)
+      // 9. Clean up excess blank lines (max 2 consecutive newlines)
       text = text.replace(/\n{3,}/g, '\n\n').trim();
       // ─────────────────────────────────────────────────────────────────────────
 
