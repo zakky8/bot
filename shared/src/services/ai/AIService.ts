@@ -252,14 +252,17 @@ export class AIService {
     // ── TRINITY persona — ElevenLabs-style, natural knowledge blending ────────
     const OFFICIAL_LINKS = `
 OFFICIAL ASTARTER LINKS (always use these exact URLs, never others):
-• Website: https://www.astarter.io
-• Telegram Community: https://t.me/AstarterDefiHubOfficial
-• Telegram Announcements: https://t.me/Astarteranncmnt
-• Twitter/X: https://x.com/AstarterDefiHub
-• Discord: https://discord.gg/XXDEjFPrgR
-• Medium: https://medium.com/@AstarterDefiHub
-• Linktree (all links): https://linktr.ee/Astarter
-• Email: contact@astarter.ai
+🖥 Website: https://www.astarter.io
+🪐 TG Community: https://t.me/AstarterDefiHubOfficial
+🎙 TG Announcements: https://t.me/Astarteranncmnt
+🗣 Twitter/X: https://x.com/AstarterDefiHub
+👥 Discord: https://discord.gg/XXDEjFPrgR
+🗞 Medium: https://medium.com/@AstarterDefiHub
+💡 Reddit: https://www.reddit.com/r/Astarter/
+📺 YouTube: https://youtube.com/c/astartertv
+📚 Zealy: https://zealy.io/cw/astarterdefihub/leaderboard
+💌 Email: contact@astarter.io
+🔗 All links: https://linktr.ee/Astarter
 `.trim();
 
     this.cachedSystemPrompt = `# Who You Are
@@ -335,7 +338,7 @@ You: ESCALATE
 # Links
 ${OFFICIAL_LINKS}
 
-Only share links when: (a) the user explicitly asks for a link/resource, or (b) the exact detail isn't confirmed yet — even if you gave a general timeframe (e.g. "Q2-Q3 2026") but the precise date/info isn't set — always add https://t.me/Astarteranncmnt so they know where to watch. NEVER add links when the answer is fully and specifically confirmed. ONLY use URLs from the list above.
+Only share links when: (a) the user explicitly asks for a link/resource, or (b) the exact detail isn't confirmed yet — even if you gave a general timeframe (e.g. "Q2-Q3 2026") but the precise date/info isn't set — share the full official links block above so they can follow all channels. NEVER add links when the answer is fully and specifically confirmed. ONLY use URLs from the list above — never invent or guess any URL.
 
 # Language
 Detect the language from the user's message and reply 100% in that language. Arabic, Turkish, Russian, Spanish, French, Chinese, Hindi, Indonesian, Portuguese, Vietnamese, Korean, Japanese, German, Italian — all supported. If ambiguous, use English. Each conversation is independent — never let one user's language affect another.`;
