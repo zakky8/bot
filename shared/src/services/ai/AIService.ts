@@ -116,7 +116,7 @@ export class AIService {
       awsSecretKey:      config.awsSecretKey      ?? '',
       awsRegion:         config.awsRegion         ?? 'us-east-1',
       ollamaHost:        config.ollamaHost        ?? 'http://localhost:11434',
-      defaultModel:      config.defaultModel      ?? 'anthropic.claude-3-haiku-20240307-v1:0',
+      defaultModel:      config.defaultModel      ?? 'openai.gpt-oss-20b-1:0',
       fallbackModel:     config.fallbackModel     ?? 'llama3.2:3b',
       maxTokens:         config.maxTokens         ?? 2000,
       temperature:       config.temperature       ?? 0.7,
@@ -467,20 +467,20 @@ LANGUAGE RULE: Detect the language from the current user's message and reply ent
   ): Promise<AIResponse> {
     if (!this.bedrock) throw new Error('AWS Bedrock not initialised');
 
-    let modelToUse = model ?? this.config.defaultModel ?? 'anthropic.claude-3-haiku-20240307-v1:0';
+    let modelToUse = model ?? this.config.defaultModel ?? 'openai.gpt-oss-20b-1:0';
 
-    // AWS Bedrock cross-region inference: EU and AP regions require a regional prefix.
-    // Strip any existing prefix first, then re-apply the correct one for the region.
-    const region = this.config.awsRegion ?? 'us-east-1';
-    // Remove existing prefix if present (e.g. eu., us., ap.)
-    const bareModel = modelToUse.replace(/^(eu|us|ap)\./, '');
-    if (region.startsWith('eu-')) {
-      modelToUse = `eu.${bareModel}`;
-    } else if (region.startsWith('ap-')) {
-      modelToUse = `ap.${bareModel}`;
-    } else {
-      // us-east-1, us-west-2 etc — use us. prefix for cross-region inference
-      modelToUse = `us.${bareModel}`;
+    // AWS Bedrock cross-region inference: only Anthropic models need a regional prefix
+    // (eu./us./ap.). OpenAI, Meta, Mistral etc. use their model ID as-is.
+    if (modelToUse.startsWith('anthropic.')) {
+      const region = this.config.awsRegion ?? 'us-east-1';
+      const bareModel = modelToUse.replace(/^(eu|us|ap)\./, '');
+      if (region.startsWith('eu-')) {
+        modelToUse = `eu.${bareModel}`;
+      } else if (region.startsWith('ap-')) {
+        modelToUse = `ap.${bareModel}`;
+      } else {
+        modelToUse = `us.${bareModel}`;
+      }
     }
 
     // Sanitise messages before sending — Bedrock requires strict alternation
