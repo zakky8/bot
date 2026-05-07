@@ -58,8 +58,12 @@ export default (bot: Bot<BotContext>) => {
     bot.on('message:new_chat_members', async (ctx) => {
         const chatId = ctx.chat.id;
 
-        // Always delete the "X joined the group" service message
-        await ctx.deleteMessage().catch(() => {});
+        // Delete the "X joined the group" service message if cleanService is enabled (default: true)
+        if (ctx.session.cleanService !== false) {
+            await ctx.deleteMessage().catch((e) =>
+                logger.warn(`Could not delete join service message in ${chatId}: ${e.message} — ensure bot has "Delete messages" admin permission`)
+            );
+        }
 
         for (const member of ctx.message.new_chat_members) {
             if (member.is_bot) continue;
@@ -184,8 +188,12 @@ export default (bot: Bot<BotContext>) => {
         const chatId = ctx.chat.id;
         const member = ctx.message.left_chat_member;
 
-        // Always delete the "X left the group" service message
-        await ctx.deleteMessage().catch(() => {});
+        // Delete the "X left the group" service message if cleanService is enabled (default: true)
+        if (ctx.session.cleanService !== false) {
+            await ctx.deleteMessage().catch((e) =>
+                logger.warn(`Could not delete leave service message in ${chatId}: ${e.message} — ensure bot has "Delete messages" admin permission`)
+            );
+        }
 
         if (member.is_bot) return;
 
@@ -201,9 +209,7 @@ export default (bot: Bot<BotContext>) => {
                 .replace(/\{chatname\}/g, ctx.chat?.title || 'Group')
                 .replace(/\{first\}/g, member.first_name)
                 .replace(/\{id\}/g, String(member.id));
-            const sent = await ctx.api.sendMessage(chatId, text, { parse_mode: 'HTML' }).catch(() => null);
-            // Delete goodbye message instantly to keep chat clean
-            if (sent) await ctx.api.deleteMessage(chatId, sent.message_id).catch(() => {});
+            await ctx.api.sendMessage(chatId, text, { parse_mode: 'HTML' }).catch(() => null);
         }
     });
     // ─────────────────────────────────────────────────────────────────────────
@@ -262,6 +268,16 @@ export default (bot: Bot<BotContext>) => {
 
         // ── Correct answer ────────────────────────────────────────────────────
         cancelPendingCaptcha(chatId, userId);
+
+        // Check if user is actually still restricted (handles stale captchas after bot restart)
+        try {
+            const member = await ctx.api.getChatMember(chatId, userId);
+            if (member.status === 'left' || member.status === 'kicked') {
+                // User already left — clean up and ignore
+                if (ctx.msg?.message_id) await ctx.api.deleteMessage(chatId, ctx.msg.message_id).catch(() => {});
+                return ctx.answerCallbackQuery();
+            }
+        } catch { /* ignore — proceed with unrestrict anyway */ }
 
         try {
             // Fully restore all default permissions
