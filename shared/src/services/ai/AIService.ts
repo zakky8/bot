@@ -116,7 +116,7 @@ export class AIService {
       awsSecretKey:      config.awsSecretKey      ?? '',
       awsRegion:         config.awsRegion         ?? 'us-east-1',
       ollamaHost:        config.ollamaHost        ?? 'http://localhost:11434',
-      defaultModel:      config.defaultModel      ?? 'openai.gpt-oss-20b-1:0',
+      defaultModel:      config.defaultModel      ?? 'amazon.nova-lite-v1:0',
       fallbackModel:     config.fallbackModel     ?? 'llama3.2:3b',
       maxTokens:         config.maxTokens         ?? 2000,
       temperature:       config.temperature       ?? 0.7,
