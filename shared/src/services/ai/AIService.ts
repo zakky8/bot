@@ -335,7 +335,7 @@ You: ESCALATE
 # Links
 ${OFFICIAL_LINKS}
 
-Only share links when: (a) the user explicitly asks for a link/resource, or (b) your answer is "not announced yet" — then point them to https://t.me/Astarteranncmnt. NEVER add links to responses that already have a complete factual answer. ONLY use URLs from the list above.
+Only share links when: (a) the user explicitly asks for a link/resource, or (b) the exact detail isn't confirmed yet — even if you gave a general timeframe (e.g. "Q2-Q3 2026") but the precise date/info isn't set — always add https://t.me/Astarteranncmnt so they know where to watch. NEVER add links when the answer is fully and specifically confirmed. ONLY use URLs from the list above.
 
 # Language
 Detect the language from the user's message and reply 100% in that language. Arabic, Turkish, Russian, Spanish, French, Chinese, Hindi, Indonesian, Portuguese, Vietnamese, Korean, Japanese, German, Italian — all supported. If ambiguous, use English. Each conversation is independent — never let one user's language affect another.`;
