@@ -654,7 +654,7 @@ LANGUAGE RULE: Detect the language from the current user's message and reply ent
     );
 
     const dynamicPrompt = ragContext
-        ? `${basePrompt}\n\n---\n# Context\n${ragContext}`
+        ? `${basePrompt}\n\n---\n# IMPORTANT CONTEXT — You MUST use the information below to answer the user's question. If the answer is in this context, DO NOT say "I'm not aware" or "hasn't been announced". Answer based on what you see here:\n\n${ragContext}`
         : basePrompt;
 
     // 6. Call AI provider
