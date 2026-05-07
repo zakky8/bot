@@ -16,8 +16,13 @@ export default (bot: Bot<BotContext>) => {
 
             if (!ctx.session.captcha) ctx.session.captcha = { enabled: false, mode: 'button' };
             ctx.session.captcha.mode = mode as 'button' | 'math' | 'text';
+            // Auto-enable captcha when a mode is chosen — no need for a separate /setcaptcha on
+            ctx.session.captcha.enabled = true;
 
-            await ctx.reply(`🔐 CAPTCHA mode set to <b>${mode}</b>.`, { parse_mode: 'HTML' });
+            await ctx.reply(
+                `🔐 CAPTCHA mode set to <b>${mode}</b> and <b>enabled</b>.\n\nNew members must verify before they can chat.\nUse <code>/setcaptcha off</code> to disable.`,
+                { parse_mode: 'HTML' }
+            );
         } catch (error) { console.error('captchamode error:', error); await ctx.reply('❌ An error occurred.'); }
     });
 };

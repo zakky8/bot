@@ -60,9 +60,12 @@ export default (bot: Bot<BotContext>) => {
 
         // Delete the "X joined the group" service message if cleanService is enabled (default: true)
         if (ctx.session.cleanService !== false) {
-            await ctx.deleteMessage().catch((e) =>
-                logger.warn(`Could not delete join service message in ${chatId}: ${e.message} — ensure bot has "Delete messages" admin permission`)
-            );
+            const deleteErr = await ctx.deleteMessage().then(() => null).catch((e: Error) => e);
+            if (deleteErr) {
+                logger.warn(`Could not delete join service message in ${chatId}: ${deleteErr.message}`);
+                // One-time hint to log channel so admin knows why it's not working
+                await sendLog(ctx, `⚠️ <b>Clean Service</b>: Failed to delete join message in <code>${chatId}</code>.\nEnsure the bot has <b>Delete Messages</b> admin permission.`).catch(() => {});
+            }
         }
 
         for (const member of ctx.message.new_chat_members) {
@@ -169,9 +172,11 @@ export default (bot: Bot<BotContext>) => {
 
         // Delete the "X left the group" service message if cleanService is enabled (default: true)
         if (ctx.session.cleanService !== false) {
-            await ctx.deleteMessage().catch((e) =>
-                logger.warn(`Could not delete leave service message in ${chatId}: ${e.message} — ensure bot has "Delete messages" admin permission`)
-            );
+            const deleteErr = await ctx.deleteMessage().then(() => null).catch((e: Error) => e);
+            if (deleteErr) {
+                logger.warn(`Could not delete leave service message in ${chatId}: ${deleteErr.message}`);
+                await sendLog(ctx, `⚠️ <b>Clean Service</b>: Failed to delete leave message in <code>${chatId}</code>.\nEnsure the bot has <b>Delete Messages</b> admin permission.`).catch(() => {});
+            }
         }
 
         if (member.is_bot) return;
