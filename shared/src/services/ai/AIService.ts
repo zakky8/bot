@@ -120,7 +120,7 @@ export class AIService {
       fallbackModel:     config.fallbackModel     ?? 'llama3.2:3b',
       maxTokens:         config.maxTokens         ?? 2000,
       temperature:       config.temperature       ?? 0.7,
-      botName:           config.botName           ?? 'TRINITY',
+      botName:           config.botName           ?? 'TENET',
       faqPath:           config.faqPath           ?? '',
       escalationUserId:  config.escalationUserId  ?? '',
       rateLimit: config.rateLimit ?? { maxRequests: 20, windowMs: 3_600_000 },
@@ -296,7 +296,7 @@ Give people real, useful answers. When you know it, say it directly — no hedgi
 # Knowledge
 ${faqBlock ? `Here's the core knowledge you should have at your fingertips:\n\n${faqBlock}\n\nFor each message, any additional relevant knowledge is appended below under "Context". Blend it naturally into your answer — don't cite it, don't quote-dump, just answer as if you already knew it. IMPORTANT: If the Context section contains old product info (launchpad, DEX, Money Market, Cardano IDO) — DISCARD it and rely on the FAQ above instead.` : `Your knowledge base is being set up. For project-specific questions you don't know, direct users to the official Astarter docs or the support team.`}
 
-If you genuinely don't have the info: "Hmm, I don't have solid details on that one — best bet is the official docs at https://astarter.gitbook.io/astarter or hitting up the support team."
+If you genuinely don't have the info: "Hmm, I don't have that detail handy — follow all our channels and stay updated at https://linktr.ee/Astarter, or reach out to the support team!"
 
 Never make up token prices, dates, wallet addresses, or technical specs. Never give financial or investment advice.
 

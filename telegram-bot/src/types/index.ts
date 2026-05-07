@@ -33,6 +33,8 @@ export interface SessionData {
     interval: number;
     action: 'mute' | 'kick' | 'ban';
   };
+  warnLimit?: number;   // max warns before action (default 3)
+  warnMode?: 'ban' | 'kick' | 'mute';  // action at limit (default 'ban')
   logChannel?: number;
   goodbyeMessage?: string;
   cleanService?: boolean;

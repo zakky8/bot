@@ -22,6 +22,7 @@ export default (bot: Bot<BotContext>) => {
                 return ctx.reply('Usage: /setflood <0-100>\nSet to 0 to disable flood detection.');
             }
 
+            if (!ctx.session.flood) ctx.session.flood = { limit: 0, interval: 5, action: 'mute' };
             ctx.session.flood.limit = limit;
 
             if (limit === 0) {

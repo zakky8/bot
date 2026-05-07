@@ -13,6 +13,7 @@ export default (bot: Bot<BotContext>) => {
             const text = ctx.message?.text?.split(' ').slice(1).join(' ');
             if (!text) return ctx.reply('Usage: /captchatext <custom message>\n\nPlaceholders: {user} {chatname}\nDefault: "Please verify you are human"');
 
+            if (!ctx.session.captcha) ctx.session.captcha = { enabled: false, mode: 'button' };
             ctx.session.captcha.text = text;
 
             await ctx.reply(`✅ CAPTCHA message set to:\n<i>${text}</i>`, { parse_mode: 'HTML' });

@@ -129,7 +129,8 @@ export default (bot: Bot<BotContext>) => {
 
       // 9. Fix dangling "check the docs:" / "see the docs:" with no URL following.
       //    This catches cases where the AI ends a sentence with a colon and no link.
-      const DOCS_URL = 'https://astarter.gitbook.io/astarter';
+      const DOCS_URL     = 'https://astarter.gitbook.io/astarter';
+      const LINKTREE_URL = 'https://linktr.ee/Astarter';
       text = text.replace(
         /\b(check(?: out)?|see|visit|view)(?: the)? docs?:?\s*$/gim,
         `$1 the docs: ${DOCS_URL}`
@@ -138,6 +139,11 @@ export default (bot: Bot<BotContext>) => {
       text = text.replace(
         /\bdocumentation[.:]\s*$/gim,
         `documentation: ${DOCS_URL}`
+      );
+      // Fix dangling "stay updated" / "follow us" / "our channels" with no URL
+      text = text.replace(
+        /\b(stay updated|follow (?:us|our channels?|our socials?)|keep up|all our channels?)[.:,]?\s*$/gim,
+        `$1 — follow us at ${LINKTREE_URL}`
       );
 
       // 10. Clean up excess blank lines (max 2 consecutive newlines)

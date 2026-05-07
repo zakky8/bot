@@ -22,6 +22,7 @@ export default (bot: Bot<BotContext>) => {
                 return ctx.reply('Usage: /setfloodmode <mute|kick|ban>');
             }
 
+            if (!ctx.session.flood) ctx.session.flood = { limit: 0, interval: 5, action: 'mute' };
             ctx.session.flood.action = mode as 'mute' | 'kick' | 'ban';
 
             await ctx.reply(`🌊 Flood action set to <b>${mode}</b>.`, { parse_mode: 'HTML' });

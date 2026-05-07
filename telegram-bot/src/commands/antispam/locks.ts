@@ -31,30 +31,35 @@ export default (bot: Bot<BotContext>) => {
 
     const parts = ctx.message?.text?.split(' ') || [];
     const type = parts[1]?.toLowerCase();
-    const mode = (parts[2]?.toLowerCase() || 'off') as any;
+    const modeArg = parts[2]?.toLowerCase();
 
     if (!type) {
-      return ctx.reply('❓ <b>Usage:</b> <code>/lock &lt;type&gt; [mode]</code>\nModes: <code>off, warn, mute, kick, ban</code>', { parse_mode: 'HTML' });
+      return ctx.reply(
+        '❓ <b>Usage:</b> <code>/lock &lt;type&gt; [mode]</code>\n' +
+        'With no mode: deletes the content silently.\n' +
+        'Modes: <code>warn, mute, kick, ban</code>\n\n' +
+        'Run /locktypes to see all lockable types.',
+        { parse_mode: 'HTML' }
+      );
     }
 
     if (!LOCK_TYPES.includes(type)) {
-      return ctx.reply(`❌ <b>Invalid type.</b>\nTry: <code>photo, sticker, url, forward, etc.</code>\n\nRun /locktypes to see all available types.`, { parse_mode: 'HTML' });
+      return ctx.reply(`❌ <b>Invalid type.</b> Run /locktypes to see all available types.`, { parse_mode: 'HTML' });
     }
 
-    const validModes = ['off', 'warn', 'mute', 'kick', 'ban'];
-    if (!validModes.includes(mode)) {
-        return ctx.reply(`❌ <b>Invalid mode.</b>\nUse: <code>off, warn, mute, kick, ban</code>`, { parse_mode: 'HTML' });
+    const validModes = ['warn', 'mute', 'kick', 'ban'];
+    if (modeArg && !validModes.includes(modeArg)) {
+        return ctx.reply(`❌ <b>Invalid mode.</b>\nUse: <code>warn, mute, kick, ban</code> — or omit for delete-only.`, { parse_mode: 'HTML' });
     }
 
-    // Guard against uninitialized session
     if (!ctx.session.locks) ctx.session.locks = {};
 
-    ctx.session.locks[type] = {
-        mode: mode,
-        delete: mode !== 'off' // Default delete to true if any mode is set
-    };
+    const mode = (modeArg || 'off') as any;
+    // No mode arg = delete only; with mode = delete + punish
+    ctx.session.locks[type] = { mode, delete: true };
 
-    await ctx.reply(`🔒 <b>Locked:</b> <code>${type}</code>\n└ Mode: <b>${mode}</b> | Deletion: <b>ON</b>`, { parse_mode: 'HTML' });
+    const modeLabel = modeArg ? `delete + <b>${mode}</b>` : `<b>delete only</b>`;
+    await ctx.reply(`🔒 <b>Locked:</b> <code>${type}</code>\n└ Action: ${modeLabel}`, { parse_mode: 'HTML' });
   });
 
   bot.command('unlock', async (ctx) => {

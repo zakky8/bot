@@ -9,17 +9,6 @@ export const authMiddleware = async (ctx: BotContext, next: NextFunction) => {
     return;
   }
 
-  // Layer 2b — File ignore: silently drop attachments sent by members in groups
-  if (ctx.chat?.type !== 'private' && !isBotAdmin(ctx)) {
-    const msg = ctx.message;
-    if (
-      msg?.document || msg?.photo || msg?.video ||
-      msg?.audio || msg?.voice || msg?.video_note ||
-      msg?.sticker || msg?.animation
-    ) {
-      return; // Silently ignore — never process member-sent files
-    }
-  }
-
+  // Note: media is NOT dropped here — locks middleware handles content enforcement.
   await next();
 };

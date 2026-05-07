@@ -52,44 +52,22 @@ async function sendWelcome(ctx: BotContext, chatId: number, member: { id: number
 
 export default (bot: Bot<BotContext>) => {
 
-    // ── Delete Telegram service "X joined / X left" messages ─────────────────
-    // These are separate from chat_member updates — they're plain message updates
-    // with new_chat_members / left_chat_member fields.
+    // ── PRIMARY join handler ─────────────────────────────────────────────────
+    // message:new_chat_members fires for EVERY join (first-time AND rejoin),
+    // making it more reliable than chat_member for captcha enforcement.
     bot.on('message:new_chat_members', async (ctx) => {
-        if (ctx.session.cleanService) {
-            await ctx.deleteMessage().catch(() => {});
-        }
-    });
+        const chatId = ctx.chat.id;
 
-    bot.on('message:left_chat_member', async (ctx) => {
-        if (ctx.session.cleanService) {
-            await ctx.deleteMessage().catch(() => {});
-        }
-    });
-    // ─────────────────────────────────────────────────────────────────────────
+        // Always delete the "X joined the group" service message
+        await ctx.deleteMessage().catch(() => {});
 
-    // ── Main join/leave handler ───────────────────────────────────────────────
-    bot.on('chat_member', async (ctx) => {
-        const oldStatus = ctx.chatMember.old_chat_member.status;
-        const newStatus = ctx.chatMember.new_chat_member.status;
-        const member    = ctx.chatMember.new_chat_member.user;
-        const chatId    = ctx.chat.id;
+        for (const member of ctx.message.new_chat_members) {
+            if (member.is_bot) continue;
 
-        // ── USER JOINED ───────────────────────────────────────────────────────
-        const isJoin = (oldStatus === 'left' || oldStatus === 'kicked') &&
-                       (newStatus === 'member' || newStatus === 'restricted');
-
-        if (isJoin && !member.is_bot) {
             logger.info(`User joined: ${member.first_name} (${member.id}) in chat ${chatId}`);
 
-            // Cancel any stale captcha from a previous join (user left and rejoined)
+            // Cancel any stale captcha (user left and rejoined before timeout)
             cancelPendingCaptcha(chatId, member.id);
-
-            await sendLog(ctx,
-                `👤 <b>New Member Joined</b>\n` +
-                `├ User: <a href="tg://user?id=${member.id}">${member.first_name}</a>\n` +
-                `└ ID: <code>${member.id}</code>`
-            );
 
             // ── Federation ban check ──────────────────────────────────────────
             const currentFedId = ctx.session.federations?.current;
@@ -109,7 +87,7 @@ export default (bot: Bot<BotContext>) => {
                         await sendLog(ctx,
                             `🛡️ <b>FBan Enforcement</b>\n├ User: ${member.first_name}\n└ Status: Banned (Federation DB)`
                         );
-                        return;
+                        continue;
                     }
                 } catch (e) { logger.error('FBan check error:', e); }
             }
@@ -126,13 +104,12 @@ export default (bot: Bot<BotContext>) => {
                         `🛡️ <b>Anti-Raid Action</b>\n├ User: ${member.first_name}\n└ Status: Kicked (Raid Mode Active)`
                     );
                 } catch (e) { logger.warn('Anti-raid kick failed:', e); }
-                return;
+                continue;
             }
 
             // Track recent joins (for raid detection)
             raid.recentJoins.push({ id: member.id, joinedAt: Date.now() });
-            const dayAgo = Date.now() - 86_400_000;
-            raid.recentJoins = raid.recentJoins.filter(j => j.joinedAt > dayAgo);
+            raid.recentJoins = raid.recentJoins.filter(j => j.joinedAt > Date.now() - 86_400_000);
 
             // ── Captcha ───────────────────────────────────────────────────────
             if (ctx.session.captcha?.enabled) {
@@ -143,7 +120,7 @@ export default (bot: Bot<BotContext>) => {
                     logger.error(`Failed to restrict user ${member.id} for captcha:`, e);
                     // Can't restrict — send welcome anyway (bot may lack permission)
                     await sendWelcome(ctx, chatId, member);
-                    return;
+                    continue;
                 }
 
                 const mode = ctx.session.captcha.mode || 'button';
@@ -155,7 +132,6 @@ export default (bot: Bot<BotContext>) => {
                     const b = Math.floor(Math.random() * 9) + 1;
                     const sum = a + b;
                     question = `🔢 <b>Quick math check</b>\n\nWhat is <code>${a} + ${b}</code>?`;
-                    // Build 4 answer buttons in random order, only one correct
                     const distractors = new Set<number>();
                     distractors.add(sum);
                     while (distractors.size < 4) {
@@ -177,13 +153,12 @@ export default (bot: Bot<BotContext>) => {
                 }).catch((e) => { logger.error('Failed to send captcha message:', e); return null; });
 
                 // ── Captcha timeout / auto-kick ───────────────────────────────
-                const kickMinutes = ctx.session.captcha.kickTime ?? 5; // default 5 min
+                const kickMinutes = ctx.session.captcha.kickTime ?? 5;
                 const msgId = sent?.message_id;
 
                 const timeout = setTimeout(async () => {
                     pendingCaptchas.delete(captchaKey(chatId, member.id));
                     logger.info(`Captcha timeout for user ${member.id} in chat ${chatId} — kicking`);
-
                     try {
                         await ctx.api.banChatMember(chatId, member.id);
                         await ctx.api.unbanChatMember(chatId, member.id); // ban+unban = kick
@@ -191,7 +166,6 @@ export default (bot: Bot<BotContext>) => {
                             `⏰ <b>Captcha Timeout</b>\n├ User: <a href="tg://user?id=${member.id}">${member.first_name}</a>\n└ Kicked after ${kickMinutes}m without verifying`
                         );
                     } catch (e) { logger.warn('Captcha kick failed:', e); }
-
                     if (msgId) await ctx.api.deleteMessage(chatId, msgId).catch(() => {});
                 }, kickMinutes * 60 * 1000);
 
@@ -202,36 +176,69 @@ export default (bot: Bot<BotContext>) => {
                 await sendWelcome(ctx, chatId, member);
             }
         }
+    });
+    // ─────────────────────────────────────────────────────────────────────────
 
-        // ── USER LEFT / KICKED ────────────────────────────────────────────────
+    // ── PRIMARY leave handler ────────────────────────────────────────────────
+    bot.on('message:left_chat_member', async (ctx) => {
+        const chatId = ctx.chat.id;
+        const member = ctx.message.left_chat_member;
+
+        // Always delete the "X left the group" service message
+        await ctx.deleteMessage().catch(() => {});
+
+        if (member.is_bot) return;
+
+        logger.info(`User left: ${member.first_name} (${member.id}) from chat ${chatId}`);
+
+        // Cancel pending captcha if they leave before verifying
+        cancelPendingCaptcha(chatId, member.id);
+
+        const goodbyeMsg = ctx.session.goodbyeMessage;
+        if (goodbyeMsg) {
+            const text = goodbyeMsg
+                .replace(/\{user\}/g, `<a href="tg://user?id=${member.id}">${member.first_name}</a>`)
+                .replace(/\{chatname\}/g, ctx.chat?.title || 'Group')
+                .replace(/\{first\}/g, member.first_name)
+                .replace(/\{id\}/g, String(member.id));
+            const sent = await ctx.api.sendMessage(chatId, text, { parse_mode: 'HTML' }).catch(() => null);
+            // Delete goodbye message instantly to keep chat clean
+            if (sent) await ctx.api.deleteMessage(chatId, sent.message_id).catch(() => {});
+        }
+    });
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // ── chat_member: logging only ─────────────────────────────────────────────
+    // Captcha + welcome are handled in message:new_chat_members above.
+    // chat_member is kept solely for structured join/leave logs.
+    bot.on('chat_member', async (ctx) => {
+        const oldStatus = ctx.chatMember.old_chat_member.status;
+        const newStatus = ctx.chatMember.new_chat_member.status;
+        const member    = ctx.chatMember.new_chat_member.user;
+        const chatId    = ctx.chat.id;
+
+        if (member.is_bot) return;
+
+        const isJoin = (oldStatus === 'left' || oldStatus === 'kicked') &&
+                       (newStatus === 'member' || newStatus === 'restricted');
+
+        if (isJoin) {
+            await sendLog(ctx,
+                `👤 <b>New Member Joined</b>\n` +
+                `├ User: <a href="tg://user?id=${member.id}">${member.first_name}</a>\n` +
+                `└ ID: <code>${member.id}</code>`
+            );
+        }
+
         const isLeave = (oldStatus === 'member' || oldStatus === 'restricted' || oldStatus === 'administrator') &&
                         (newStatus === 'left' || newStatus === 'kicked');
 
-        if (isLeave && !member.is_bot) {
-            logger.info(`User left: ${member.first_name} (${member.id}) from chat ${chatId}`);
-
-            // Cancel pending captcha if they leave before verifying
-            cancelPendingCaptcha(chatId, member.id);
-
+        if (isLeave) {
             await sendLog(ctx,
                 `👋 <b>Member Left</b>\n` +
                 `├ User: <a href="tg://user?id=${member.id}">${member.first_name}</a>\n` +
                 `└ ID: <code>${member.id}</code>`
             );
-
-            const goodbyeMsg = ctx.session.goodbyeMessage;
-            if (goodbyeMsg) {
-                const text = goodbyeMsg
-                    .replace(/\{user\}/g, `<a href="tg://user?id=${member.id}">${member.first_name}</a>`)
-                    .replace(/\{chatname\}/g, ctx.chat?.title || 'Group')
-                    .replace(/\{first\}/g, member.first_name)
-                    .replace(/\{id\}/g, String(member.id));
-                const sent = await ctx.api.sendMessage(chatId, text, { parse_mode: 'HTML' }).catch(() => null);
-                // Delete goodbye message instantly to keep the chat clean
-                if (sent) {
-                    await ctx.api.deleteMessage(chatId, sent.message_id).catch(() => {});
-                }
-            }
         }
     });
     // ─────────────────────────────────────────────────────────────────────────

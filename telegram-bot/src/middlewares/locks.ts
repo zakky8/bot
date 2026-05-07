@@ -42,22 +42,27 @@ export const locksMiddleware = async (ctx: BotContext, next: NextFunction) => {
     else if (msg.game) triggerType = 'game';
     else if (msg.story) triggerType = 'story';
 
-    // 2. Advanced/Meta Locks
+    // 2. Advanced/Meta Locks — only set if no media type already matched
     const entities = [...(msg.entities || []), ...(msg.caption_entities || [])];
-    const hasLink = entities.some(e => e.type === 'url' || e.type === 'text_link');
-    if (hasLink) triggerType = 'url';
-    
-    if (msg.text?.includes('t.me/joinchat') || msg.text?.includes('t.me/+')) triggerType = 'invitelink';
-    if ((msg as any).forward_from || (msg as any).forward_from_chat) triggerType = 'forward';
-    if (entities.some(e => e.type === 'bot_command')) triggerType = 'command';
-    if (msg.invoice || msg.successful_payment) triggerType = 'payment';
-    if (msg.via_bot) triggerType = 'inline';
-    if (msg.reply_markup) triggerType = 'keyboard';
-    if (msg.giveaway || (msg as any).giveaway_created || (msg as any).giveaway_winners) triggerType = 'giveaway';
-    if (msg.new_chat_members?.some(u => u.is_bot)) triggerType = 'bot';
 
-    // 3. Premium/Animated Emoji Detection
-    if (entities.some(e => e.type === 'custom_emoji')) triggerType = 'premium_emoji';
+    if (!triggerType) {
+        if (msg.new_chat_members?.some(u => u.is_bot)) triggerType = 'bot';
+        else if (msg.giveaway || (msg as any).giveaway_created || (msg as any).giveaway_winners) triggerType = 'giveaway';
+        else if (msg.invoice || msg.successful_payment) triggerType = 'payment';
+        else if (msg.via_bot) triggerType = 'inline';
+        else if (msg.reply_markup) triggerType = 'keyboard';
+        else if ((msg as any).forward_from || (msg as any).forward_from_chat) triggerType = 'forward';
+        else if (msg.text?.includes('t.me/joinchat') || msg.text?.includes('t.me/+')) triggerType = 'invitelink';
+        else if (entities.some(e => e.type === 'url' || e.type === 'text_link')) {
+            // Distinguish invite links from regular URLs
+            const urls: string[] = entities
+                .filter(e => e.type === 'url' || e.type === 'text_link')
+                .map(e => (e as any).url || msg.text?.slice(e.offset, e.offset + e.length) || '');
+            triggerType = urls.some(u => u.includes('t.me/joinchat') || u.includes('t.me/+')) ? 'invitelink' : 'url';
+        }
+        else if (entities.some(e => e.type === 'bot_command')) triggerType = 'command';
+        else if (entities.some(e => e.type === 'custom_emoji')) triggerType = 'premium_emoji';
+    }
 
 
     if (triggerType && locks[triggerType]) {
