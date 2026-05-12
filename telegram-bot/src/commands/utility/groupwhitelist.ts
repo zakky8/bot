@@ -20,7 +20,12 @@ export default (bot: Bot<BotContext>) => {
   //   /addgroup -1001234567890 — add by numeric ID
   //   /addgroup                — inside a group, adds the current group
   bot.command('addgroup', async (ctx: BotContext) => {
-    if (!isBotAdmin(ctx)) return denyAccess(ctx, true);
+    if (!isBotAdmin(ctx)) {
+      return ctx.reply(
+        '🔒 This command requires <b>bot admin</b> access.\n\nAsk the owner to add you with <code>/addbotadmin &lt;your_id&gt;</code>.',
+        { parse_mode: 'HTML' }
+      );
+    }
 
     const arg = (ctx.match as string)?.trim();
     let targetId: string;
@@ -85,7 +90,12 @@ export default (bot: Bot<BotContext>) => {
 
   // ── /addgroups alias (common typo with trailing 's') ──────────────────────
   bot.command('addgroups', async (ctx: BotContext) => {
-    if (!isBotAdmin(ctx)) return denyAccess(ctx, true);
+    if (!isBotAdmin(ctx)) {
+      return ctx.reply(
+        '🔒 This command requires <b>bot admin</b> access.\n\nAsk the owner to add you with <code>/addbotadmin &lt;your_id&gt;</code>.',
+        { parse_mode: 'HTML' }
+      );
+    }
     return ctx.reply(
       '💡 Did you mean <code>/addgroup</code>? (no \'s\' at the end)\n\nUsage:\n• <code>/addgroup @username</code>\n• <code>/addgroup -100xxxxxxxxxx</code>\n• Run <code>/addgroup</code> inside the group',
       { parse_mode: 'HTML' }
