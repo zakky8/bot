@@ -406,7 +406,7 @@ Partner links (ONLY when user explicitly asks for a partner's link):
 • PayGo → https://www.paygo.ac
 • Zeus Network → https://zeusnetwork.xyz
 • ENI / ENIAC → https://eniac.network
-• MULAN / Mulan Labs → NO LINK. MULAN has no dedicated public URL in this table. Do NOT give any link for MULAN — not linktree, not any guessed URL. If asked for MULAN's link, say: "MULAN hasn't published a standalone link yet — follow the Astarter announcements for updates."
+• MULAN / Mulan Labs → https://mulan.meme
 
 Link rules:
 • Share a link ONLY when the user explicitly asks for it ("give me the link", "what's the URL", "where can I find it").
