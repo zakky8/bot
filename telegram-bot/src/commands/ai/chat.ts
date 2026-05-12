@@ -27,7 +27,19 @@ const LINK_LOOKUP: Array<{ keywords: string[]; url: string; label: string }> = [
     url: 'https://youtube.com/c/astartertv', label: 'YouTube' },
   { keywords: ['zealy', 'quest', 'tasks'],
     url: 'https://zealy.io/cw/astarterdefihub/leaderboard', label: 'Zealy' },
-  { keywords: ['linktree', 'all links', 'all socials', 'every link', 'social media'],
+  { keywords: [
+      'linktree', 'all links', 'all socials', 'every link', 'social media',
+      // Russian
+      'социальные сети', 'соцсети', 'ссылки', 'все ссылки', 'все соцсети', 'социалки',
+      // Turkish
+      'sosyal medya', 'tüm linkler', 'bütün linkler',
+      // Arabic
+      'روابط', 'وسائل التواصل',
+      // Spanish/Portuguese
+      'redes sociales', 'todos los links', 'redes sociais',
+      // Chinese
+      '所有链接', '社交媒体',
+    ],
     url: 'https://linktr.ee/Astarter', label: 'All Official Links' },
 ];
 
@@ -40,6 +52,8 @@ function detectLinkRequest(message: string): { url: string; label: string } | nu
   const wordCount = lower.split(/\s+/).length;
   const hasLinkIntent =
     /\b(link|url|website|site|page|channel|account|address|give|send|share|where)\b/.test(lower) ||
+    // Russian: дай/дайте (give), ссылку/ссылки (link/links), покажи (show)
+    /(дай|дайте|ссылк|покажи|соцсет|социальн)/.test(lower) ||
     wordCount <= 5;
 
   if (!hasLinkIntent) return null;
