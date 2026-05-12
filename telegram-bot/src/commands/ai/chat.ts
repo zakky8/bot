@@ -124,7 +124,7 @@ export default (bot: Bot<BotContext>) => {
   /**
    * Common AI Chat Handler
    */
-  const handleAiChat = async (ctx: BotContext, message: string) => {
+  const handleAiChat = async (ctx: BotContext, message: string, mentionPrefix = '') => {
     try {
       // Check if AI is enabled for this chat
       if (ctx.chat?.type !== 'private' && ctx.session.aiEnabled === false) {
@@ -236,12 +236,14 @@ export default (bot: Bot<BotContext>) => {
         text = 'You can find all official Astarter links at <a href="https://linktr.ee/Astarter">linktr.ee/Astarter</a> 🔗';
       }
 
-      // In groups the reply already quotes the user's message (reply_parameters).
-      // No need to prepend username — AI addresses them naturally in the response.
-      // But ensure any @handle the AI put at the very top (as a bare line) is stripped
-      // so we never have a naked "@username\nHey @username..." double-mention.
+      // Strip any @handle the AI put at the very top to avoid double-mention.
       if (isGroup) {
         text = text.replace(/^@[\w]+\s*\n/, '');
+      }
+
+      // Prepend mention of the original message author so they get notified
+      if (mentionPrefix) {
+        text = `${mentionPrefix}\n${text}`;
       }
 
       // Reply-to: quote the member's message in every group response
@@ -315,6 +317,8 @@ export default (bot: Bot<BotContext>) => {
 
     // Reply-to support: /ai sent as a reply to another message
     const repliedMsg = ctx.message?.reply_to_message;
+    let mentionPrefix = '';
+
     if (repliedMsg) {
       const repliedText = (repliedMsg.text || repliedMsg.caption || '').trim();
       if (!repliedText) {
@@ -325,11 +329,18 @@ export default (bot: Bot<BotContext>) => {
       }
       const safeRepliedText = repliedText.slice(0, 1000);
       if (!message) {
-        // /ai with no extra text — use the replied message as the question
         message = safeRepliedText;
       } else {
-        // /ai <question> as a reply — use replied message as additional context
         message = `${message}\n\n[Referring to: "${safeRepliedText}"]`;
+      }
+
+      // Build mention for the original message author (C) so they get notified
+      const isGroup = ctx.chat?.type !== 'private';
+      const author = repliedMsg.from;
+      if (isGroup && author && !author.is_bot && author.id !== ctx.from?.id) {
+        mentionPrefix = author.username
+          ? `@${author.username}`
+          : `<a href="tg://user?id=${author.id}">${author.first_name}</a>`;
       }
     }
 
@@ -340,7 +351,7 @@ export default (bot: Bot<BotContext>) => {
       );
     }
 
-    await handleAiChat(ctx, message);
+    await handleAiChat(ctx, message, mentionPrefix);
   };
 
   bot.command('ask', askHandler);
