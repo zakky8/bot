@@ -68,9 +68,10 @@ export function registerBotMemberHandler(bot: any) {
         const ownerId = process.env.OWNER_ID;
 
         // Notify owner via DM
-        if (ownerId) {
+        const ownerIdNum = ownerId ? parseInt(ownerId, 10) : NaN;
+        if (!Number.isNaN(ownerIdNum)) {
           await ctx.api.sendMessage(
-            parseInt(ownerId, 10),
+            ownerIdNum,
             `⚠️ <b>Unauthorized Group Added</b>\n\n` +
             `Bot was added to: <b>${chatTitle}</b>\n` +
             `Chat ID: <code>${chatId}</code>\n\n` +

@@ -8,6 +8,9 @@ const BOT_ADMINS_FILE = path.join(__dirname, '..', '..', 'bot_admins.json');
 const adminCache = new Map<number, { admins: number[], expires: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+// In-memory cache for bot admins — avoids disk reads on every message
+let botAdminsCache: string[] | null = null;
+
 /**
  * Get group admins, using cache if available.
  */
@@ -32,22 +35,29 @@ export async function getGroupAdmins(ctx: BotContext): Promise<number[]> {
 }
 
 /**
- * Load bot admins from file.
+ * Load bot admins — returns in-memory cache; reads disk only on first call or after save.
  */
 export function getBotAdmins(): string[] {
+  if (botAdminsCache !== null) return botAdminsCache;
   try {
-    if (!fs.existsSync(BOT_ADMINS_FILE)) return [];
-    return JSON.parse(fs.readFileSync(BOT_ADMINS_FILE, 'utf-8'));
+    if (!fs.existsSync(BOT_ADMINS_FILE)) {
+      botAdminsCache = [];
+      return botAdminsCache;
+    }
+    botAdminsCache = JSON.parse(fs.readFileSync(BOT_ADMINS_FILE, 'utf-8'));
+    return botAdminsCache!;
   } catch (err) {
-    return [];
+    botAdminsCache = [];
+    return botAdminsCache;
   }
 }
 
 /**
- * Save bot admins to file.
+ * Save bot admins to file asynchronously and update the in-memory cache.
  */
-export function saveBotAdmins(admins: string[]): void {
-  fs.writeFileSync(BOT_ADMINS_FILE, JSON.stringify(admins, null, 2));
+export async function saveBotAdmins(admins: string[]): Promise<void> {
+  botAdminsCache = admins;
+  await fs.promises.writeFile(BOT_ADMINS_FILE, JSON.stringify(admins, null, 2));
 }
 
 /**

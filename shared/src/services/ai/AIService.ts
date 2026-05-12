@@ -872,8 +872,10 @@ Detect the language from the user's message and reply 100% in that language. Ara
       response.content = "I don't have that link confirmed right now — you can find all official Astarter links at https://linktr.ee/Astarter 🔗";
     }
 
-    // 8. Handle escalation signal — check loosely so punctuation/whitespace variants still match
-    if (/^ESCALATE[.!]?\s*$/i.test(response.content.trim())) {
+    // 8. Handle escalation signal — strip Markdown bold/italic wrappers before checking
+    //    (AI sometimes outputs **ESCALATE** instead of bare ESCALATE)
+    const escalateCandidate = response.content.trim().replace(/^\*{1,2}(.*?)\*{1,2}$/, '$1').trim();
+    if (/^ESCALATE[.!]?\s*$/i.test(escalateCandidate)) {
       response.isEscalation = true;
       response.content =
         "I want to make sure you get the right help — let me flag this for a team member who can assist you further! 🙌";

@@ -188,6 +188,7 @@ async function init() {
       const stopServer = () => {
         logger.info('Stopping webhook server...');
         server.close();
+        sessionRedis.quit().catch(() => {});
       };
       process.once('SIGINT', stopServer);
       process.once('SIGTERM', stopServer);
@@ -207,6 +208,7 @@ async function init() {
       const stopRunner = () => {
         logger.info('Stopping polling runner...');
         runner.isRunning() && runner.stop();
+        sessionRedis.quit().catch(() => {});
       };
       process.once('SIGINT', stopRunner);
       process.once('SIGTERM', stopRunner);

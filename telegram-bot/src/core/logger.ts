@@ -22,8 +22,8 @@ export const createLogger = (label: string) => {
           winston.format.simple()
         ),
       }),
-      new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-      new winston.transports.File({ filename: 'logs/combined.log' }),
+      new winston.transports.File({ filename: 'logs/error.log', level: 'error', maxsize: 10_485_760, maxFiles: 3 }),
+      new winston.transports.File({ filename: 'logs/combined.log', maxsize: 20_971_520, maxFiles: 5 }),
     ],
   });
 };

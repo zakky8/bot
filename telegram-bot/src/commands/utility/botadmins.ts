@@ -37,7 +37,7 @@ export default (bot: Bot<BotContext>) => {
             }
 
             admins.push(targetId);
-            saveBotAdmins(admins);
+            await saveBotAdmins(admins);
 
             logger.info(`Owner ${ctx.from?.id} added ${targetId} as Bot Admin`);
             await ctx.reply(`✅ <b>Bot Admin Added</b>\n\nUser <b>${targetName}</b> (<code>${targetId}</code>) has been granted Bot Admin permissions. They can now manage the bot settings across all groups.`, { parse_mode: 'HTML' });
@@ -78,7 +78,7 @@ export default (bot: Bot<BotContext>) => {
             }
 
             admins = admins.filter(id => id !== targetId);
-            saveBotAdmins(admins);
+            await saveBotAdmins(admins);
 
             logger.info(`Owner ${ctx.from?.id} removed ${targetId} from Bot Admins`);
             await ctx.reply(`⛔️ <b>Bot Admin Removed</b>\n\nUser <b>${targetName}</b> (<code>${targetId}</code>) has been removed from Bot Admins.`, { parse_mode: 'HTML' });

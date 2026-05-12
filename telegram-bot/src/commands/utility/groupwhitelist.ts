@@ -69,7 +69,7 @@ export default (bot: Bot<BotContext>) => {
     }
 
     const addedBy = ctx.from?.id?.toString() || 'unknown';
-    const added = addGroupToWhitelist(targetId, targetTitle, addedBy);
+    const added = await addGroupToWhitelist(targetId, targetTitle, addedBy);
 
     if (!added) {
       return ctx.reply(
@@ -124,7 +124,7 @@ export default (bot: Bot<BotContext>) => {
       );
     }
 
-    const removed = removeGroupFromWhitelist(targetId);
+    const removed = await removeGroupFromWhitelist(targetId);
 
     if (!removed) {
       return ctx.reply(

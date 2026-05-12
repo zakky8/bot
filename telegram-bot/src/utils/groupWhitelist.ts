@@ -10,17 +10,27 @@ interface WhitelistEntry {
   addedAt: string;
 }
 
+// In-memory cache — avoids disk reads on every group message
+let cache: WhitelistEntry[] | null = null;
+
 function load(): WhitelistEntry[] {
+  if (cache !== null) return cache;
   try {
-    if (!fs.existsSync(WHITELIST_FILE)) return [];
-    return JSON.parse(fs.readFileSync(WHITELIST_FILE, 'utf-8'));
+    if (!fs.existsSync(WHITELIST_FILE)) {
+      cache = [];
+      return cache;
+    }
+    cache = JSON.parse(fs.readFileSync(WHITELIST_FILE, 'utf-8'));
+    return cache!;
   } catch {
-    return [];
+    cache = [];
+    return cache;
   }
 }
 
-function save(entries: WhitelistEntry[]): void {
-  fs.writeFileSync(WHITELIST_FILE, JSON.stringify(entries, null, 2));
+async function save(entries: WhitelistEntry[]): Promise<void> {
+  cache = entries;
+  await fs.promises.writeFile(WHITELIST_FILE, JSON.stringify(entries, null, 2));
 }
 
 export function isGroupWhitelisted(chatId: string | number): boolean {
@@ -28,21 +38,21 @@ export function isGroupWhitelisted(chatId: string | number): boolean {
   return load().some(e => e.chatId === id);
 }
 
-export function addGroupToWhitelist(chatId: string | number, title: string, addedBy: string): boolean {
+export async function addGroupToWhitelist(chatId: string | number, title: string, addedBy: string): Promise<boolean> {
   const id = chatId.toString();
   const entries = load();
-  if (entries.some(e => e.chatId === id)) return false; // already exists
+  if (entries.some(e => e.chatId === id)) return false;
   entries.push({ chatId: id, title, addedBy, addedAt: new Date().toISOString() });
-  save(entries);
+  await save(entries);
   return true;
 }
 
-export function removeGroupFromWhitelist(chatId: string | number): boolean {
+export async function removeGroupFromWhitelist(chatId: string | number): Promise<boolean> {
   const id = chatId.toString();
   const entries = load();
   const filtered = entries.filter(e => e.chatId !== id);
-  if (filtered.length === entries.length) return false; // not found
-  save(filtered);
+  if (filtered.length === entries.length) return false;
+  await save(filtered);
   return true;
 }
 

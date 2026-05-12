@@ -179,9 +179,10 @@ export class VectorStoreService {
             // Merge consecutive tiny chunks (< 100 chars) into the next one
             const merged: string[] = [];
             let carry = '';
-            for (const raw of rawChunks) {
+            for (let i = 0; i < rawChunks.length; i++) {
+                const raw = rawChunks[i];
                 const combined = carry ? carry + '\n' + raw : raw;
-                if (combined.length < 100 && rawChunks.indexOf(raw) < rawChunks.length - 1) {
+                if (combined.length < 100 && i < rawChunks.length - 1) {
                     carry = combined;
                 } else {
                     merged.push(combined.trim());

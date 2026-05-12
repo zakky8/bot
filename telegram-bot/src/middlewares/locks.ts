@@ -113,9 +113,10 @@ async function executeLockAction(ctx: BotContext, action: LockAction, type: stri
                 });
                 
                 const warnCount = ctx.session.warnings[userId].length;
-                await ctx.reply(`⚠️ <b>${user.first_name}</b>, sending <b>${type}</b> is restricted in this chat.\n└ <b>Warning:</b> ${warnCount}/3`, { parse_mode: 'HTML' });
-                
-                if (warnCount >= 3) {
+                const warnLimit = ctx.session.warnLimit ?? 3;
+                await ctx.reply(`⚠️ <b>${user.first_name}</b>, sending <b>${type}</b> is restricted in this chat.\n└ <b>Warning:</b> ${warnCount}/${warnLimit}`, { parse_mode: 'HTML' });
+
+                if (warnCount >= warnLimit) {
                     try {
                         await ctx.banChatMember(userId);
                         await ctx.reply(`🚫 <b>${user.first_name}</b> has been banned (Reached 3 warnings).`, { parse_mode: 'HTML' });
