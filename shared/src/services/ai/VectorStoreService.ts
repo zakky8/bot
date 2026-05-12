@@ -160,30 +160,52 @@ export class VectorStoreService {
     }
 
     async addDocuments(text: string, metadata: any = {}): Promise<{ indexed: number; failed: number }> {
-        // Smart chunking:
-        // 1. Split on double newlines first (paragraph boundaries)
-        // 2. Any remaining chunk > 800 chars (no double newlines — e.g. X posts, dense paragraphs)
-        //    gets split further on single newlines or sentences
+        // Smart chunking strategy:
+        // • Short docs (≤ 800 chars total) — keep as ONE chunk. Event posts, X posts,
+        //   short announcements embed much better as a whole than as 4 x 50-char fragments.
+        // • Long docs — split on double newlines (paragraph boundaries), then on single
+        //   newlines if any paragraph is still > 800 chars.
         const MAX_CHUNK = 800;
-        const rawChunks = text.split(/\n\n+/).filter(c => c.trim().length > 0);
+        const cleaned = text.trim();
         const chunks: string[] = [];
 
-        for (const raw of rawChunks) {
-            if (raw.length <= MAX_CHUNK) {
-                chunks.push(raw.trim());
-            } else {
-                // Try splitting on single newlines first
-                const lines = raw.split(/\n/).filter(l => l.trim().length > 0);
-                let current = '';
-                for (const line of lines) {
-                    if ((current + ' ' + line).length > MAX_CHUNK && current.length > 0) {
-                        chunks.push(current.trim());
-                        current = line;
-                    } else {
-                        current = current ? current + ' ' + line : line;
-                    }
+        if (cleaned.length <= MAX_CHUNK) {
+            // Small doc: keep entire text as one chunk for best embedding quality
+            chunks.push(cleaned);
+        } else {
+            const rawChunks = cleaned.split(/\n\n+/).filter(c => c.trim().length > 0);
+
+            // Merge consecutive tiny chunks (< 100 chars) into the next one
+            const merged: string[] = [];
+            let carry = '';
+            for (const raw of rawChunks) {
+                const combined = carry ? carry + '\n' + raw : raw;
+                if (combined.length < 100 && rawChunks.indexOf(raw) < rawChunks.length - 1) {
+                    carry = combined;
+                } else {
+                    merged.push(combined.trim());
+                    carry = '';
                 }
-                if (current.trim().length > 0) chunks.push(current.trim());
+            }
+            if (carry.trim()) merged.push(carry.trim());
+
+            for (const raw of merged) {
+                if (raw.length <= MAX_CHUNK) {
+                    chunks.push(raw.trim());
+                } else {
+                    // Oversized paragraph: split on single newlines
+                    const lines = raw.split(/\n/).filter(l => l.trim().length > 0);
+                    let current = '';
+                    for (const line of lines) {
+                        if ((current + ' ' + line).length > MAX_CHUNK && current.length > 0) {
+                            chunks.push(current.trim());
+                            current = line;
+                        } else {
+                            current = current ? current + '\n' + line : line;
+                        }
+                    }
+                    if (current.trim().length > 0) chunks.push(current.trim());
+                }
             }
         }
 
