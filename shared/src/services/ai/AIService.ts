@@ -699,6 +699,12 @@ Detect the language from the user's message and reply 100% in that language. Ara
     // Strip "[Context: User is @x]\n" prefix so it doesn't pollute the embedding query
     const cleanCurrent = safeMessage.replace(/^\[Context:[^\]]*\]\n?/i, '').trim();
 
+    // Strip conversational question preambles that add noise to embedding similarity.
+    // "do you know when turkey meetup?" → "turkey meetup"
+    // Without this, the preamble shifts the embedding vector away from the actual topic.
+    const RAG_PREAMBLE = /^(do you know|can you tell me|can you explain|what (is|are|was|were)|who (is|are|was)|where (is|are)|when (is|are|was)|how (do|does|did|can|should|is)|tell me about|i (want|need) to know|i have a question about|please (explain|tell me|describe)|any (info|information|details|update|news) (on|about|regarding)|is (there|it)|are there|have you heard|do you have)\s+/i;
+    const topicQuery = cleanCurrent.replace(RAG_PREAMBLE, '').trim() || cleanCurrent;
+
     // For follow-up questions, enrich the RAG query with the last assistant reply
     // so short follow-ups like "what about fees?" find the right context
     const lastAssistant = context.messages
@@ -710,10 +716,10 @@ Detect the language from the user's message and reply 100% in that language. Ara
         ?.replace(/^\[Context:[^\]]*\]\n?/i, '').trim() ?? '';
 
     // If this looks like a short follow-up (<60 chars), prepend previous turn for richer search
-    const isFollowUp = cleanCurrent.length < 60 && lastUser.length > 0;
+    const isFollowUp = topicQuery.length < 60 && lastUser.length > 0;
     const ragQuery = isFollowUp
-        ? `${lastUser} ${cleanCurrent}`.slice(0, 400)
-        : cleanCurrent;
+        ? `${lastUser} ${topicQuery}`.slice(0, 400)
+        : topicQuery;
 
     let ragContext = '';
     if (this.vectorStore && ragQuery.length > 0) {
