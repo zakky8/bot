@@ -243,6 +243,10 @@ async function init() {
       { command: 'addbotadmin', description: 'Promote a user to Global Bot Admin (Owner Only)' },
       { command: 'delbotadmin', description: 'Demote a Global Bot Admin (Owner Only)' },
       { command: 'botadmins', description: 'List all Global Bot Admins (Owner Only)' },
+      { command: 'addgroup', description: 'Authorize a group to use the bot (Admin Only)' },
+      { command: 'removegroup', description: 'Deauthorize a group (Owner Only)' },
+      { command: 'listgroups', description: 'List all authorized groups (Owner Only)' },
+      { command: 'groupstatus', description: 'Check if current group is authorized (Admin Only)' },
     ], { scope: { type: 'all_private_chats' } });
 
     logger.info('Command menu registered (groups: /ask only | DMs: full list)');
