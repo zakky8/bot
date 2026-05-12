@@ -83,6 +83,15 @@ export default (bot: Bot<BotContext>) => {
     );
   });
 
+  // ── /addgroups alias (common typo with trailing 's') ──────────────────────
+  bot.command('addgroups', async (ctx: BotContext) => {
+    if (!isBotAdmin(ctx)) return denyAccess(ctx, true);
+    return ctx.reply(
+      '💡 Did you mean <code>/addgroup</code>? (no \'s\' at the end)\n\nUsage:\n• <code>/addgroup @username</code>\n• <code>/addgroup -100xxxxxxxxxx</code>\n• Run <code>/addgroup</code> inside the group',
+      { parse_mode: 'HTML' }
+    );
+  });
+
   // ── /removegroup ───────────────────────────────────────────────────────────
   // Only owner can remove a group.
   // Usage:
