@@ -120,12 +120,20 @@ const ALLOWED_URLS = new Set([
   'https://youtube.com/c/astartertv',
   'https://zealy.io/cw/astarterdefihub/leaderboard',
   'https://linktr.ee/Astarter',
-  // Partner links
+  // Partner links — PayGo
+  'https://www.paygo.ac',
   'https://x.com/PayGo402',
-  'https://x.com/ZeusNetworkHQ',
+  'https://t.me/Paygo_eni',
+  // Partner links — Zeus Network
   'https://zeusnetwork.xyz',
-  'https://x.com/ENI__Official',
+  'https://x.com/ZeusNetworkHQ',
+  'https://discord.gg/zeusnetwork',
+  // Partner links — ENI / ENIAC Network
   'https://eniac.network',
+  'https://docs.eniac.network',
+  'https://x.com/ENI__Official',
+  'https://t.me/ENI_Channel',
+  'https://t.me/ENI_Community',
 ]);
 
 
