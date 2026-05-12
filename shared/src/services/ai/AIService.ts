@@ -109,6 +109,7 @@ const MAX_INPUT_LENGTH = 1000;
 
 // Allowed URLs — the only links the bot is permitted to output
 const ALLOWED_URLS = new Set([
+  // Astarter official channels
   'https://www.astarter.io',
   'https://t.me/AstarterDefiHubOfficial',
   'https://t.me/Astarteranncmnt',
@@ -119,6 +120,12 @@ const ALLOWED_URLS = new Set([
   'https://youtube.com/c/astartertv',
   'https://zealy.io/cw/astarterdefihub/leaderboard',
   'https://linktr.ee/Astarter',
+  // Partner links
+  'https://x.com/PayGo402',
+  'https://x.com/ZeusNetworkHQ',
+  'https://zeusnetwork.xyz',
+  'https://x.com/ENI__Official',
+  'https://eniac.network',
 ]);
 
 
