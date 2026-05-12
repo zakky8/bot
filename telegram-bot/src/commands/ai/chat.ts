@@ -17,9 +17,8 @@ const EXPLICIT_CONFESSION_PATTERNS = [
 // Wrong/outdated links that must never appear in responses.
 // Maps pattern → correct replacement URL.
 const BANNED_LINK_REPLACEMENTS: Array<[RegExp, string]> = [
-  // Any gitbook URL (old docs site or gitbook path) → Linktree
+  // Old defunct docs domain → Linktree
   [/https?:\/\/docs\.astarter\.io\S*/gi, 'https://linktr.ee/Astarter'],
-  [/https?:\/\/astarter\.gitbook\.io\S*/gi, 'https://linktr.ee/Astarter'],
   // Old wrong announcement link (lowercase 'a')
   [/https?:\/\/t\.me\/astarteranncmnt(?!\w)/gi, 'https://t.me/Astarteranncmnt'],
 ];
