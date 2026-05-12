@@ -248,8 +248,21 @@ export class AIService {
 
   async addDocument(text: string, metadata: any = {}): Promise<void> {
     if (!this.vectorStore) throw new Error('Vector store not initialized. Check AWS credentials.');
-    await this.vectorStore.addDocuments(text, metadata);
-    this.logger.info('Document added and indexed');
+    const result = await this.vectorStore.addDocuments(text, metadata);
+    this.logger.info(`Document indexed: ${result.indexed} chunks OK, ${result.failed} failed`);
+    if (result.failed > 0) {
+      throw new Error(`Partial indexing: ${result.indexed} succeeded, ${result.failed} chunks failed to embed`);
+    }
+  }
+
+  /** Raw search — returns top-k chunks with scores. Used by /testsearch for debugging. */
+  async searchDocs(
+    query: string,
+    k = 5,
+    typeFilter?: string[],
+  ): Promise<{ pageContent: string; metadata: any; score: number }[]> {
+    if (!this.vectorStore) return [];
+    return this.vectorStore.searchFiltered(query, k, typeFilter);
   }
 
   async removeDocumentBySource(sourceName: string): Promise<void> {
@@ -701,22 +714,32 @@ Detect the language from the user's message and reply 100% in that language. Ara
         // each type separately, always show deck knowledge first, only include history when
         // deck has fewer than 2 hits (i.e. question is community/sentiment, not product).
 
-        // Confidence threshold: only use chunks with cosine similarity ≥ 0.45
-        // Below this score the chunk is weakly related and more likely to mislead than help.
-        const MIN_SCORE = 0.45;
+        // Confidence threshold — lowered from 0.45 to 0.35 to account for hybrid scoring.
+        // Hybrid score = 0.7*cosine + 0.3*keyword. Since keyword can be 0 for short/vague
+        // queries, a strong cosine match (0.5) produces hybrid = 0.35 — not 0.5.
+        // Using 0.35 here gives equivalent filtering quality to 0.45 pure-cosine.
+        const MIN_SCORE = 0.35;
 
         // Pass 1: current project knowledge
-        const deckRaw = await this.vectorStore.searchFiltered(ragQuery, 3, ['astarter_deck', 'manual']);
+        const deckRaw = await this.vectorStore.searchFiltered(ragQuery, 5, ['astarter_deck', 'manual']);
         let deckHits = deckRaw.filter(h => h.score >= MIN_SCORE);
+
+        // Debug: always log top scores so PM2 logs show what was found/filtered
+        if (deckRaw.length > 0) {
+            const topScores = deckRaw.slice(0, 3).map(h => h.score.toFixed(3)).join(', ');
+            this.logger.info(`RAG deck scores: [${topScores}] → ${deckHits.length} passed (threshold ${MIN_SCORE})`);
+        }
 
         // CRAG: if zero authoritative hits, simplify query and retry once (corrective retrieval)
         if (deckHits.length === 0 && ragQuery.length > 20) {
             const shortQuery = ragQuery.split(/\s+/).slice(0, 5).join(' ');
-            const retryRaw = await this.vectorStore.searchFiltered(shortQuery, 3, ['astarter_deck', 'manual']);
+            const retryRaw = await this.vectorStore.searchFiltered(shortQuery, 5, ['astarter_deck', 'manual']);
             const retryHits = retryRaw.filter(h => h.score >= MIN_SCORE - 0.05);
             if (retryHits.length > 0) {
                 deckHits = retryHits;
                 this.logger.info(`CRAG retry: ${retryHits.length} hits with shortened query "${shortQuery}"`);
+            } else {
+                this.logger.info(`CRAG retry also missed — top score: ${retryRaw[0]?.score.toFixed(3) ?? 'none'}`);
             }
         }
 
@@ -725,13 +748,6 @@ Detect the language from the user's message and reply 100% in that language. Ara
             ? await this.vectorStore.searchFiltered(ragQuery, 2, ['telegram_history'])
             : [];
         const histHits = histRaw.filter(h => h.score >= MIN_SCORE);
-
-        if (deckRaw.length !== deckHits.length || histRaw.length !== histHits.length) {
-            this.logger.info(
-                `RAG confidence filter: deck ${deckRaw.length}→${deckHits.length}, ` +
-                `hist ${histRaw.length}→${histHits.length} (threshold ${MIN_SCORE})`
-            );
-        }
 
         const parts: string[] = [];
         if (deckHits.length > 0) {

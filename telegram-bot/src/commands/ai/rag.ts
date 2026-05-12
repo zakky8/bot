@@ -257,19 +257,33 @@ export default (bot: Bot<BotContext>) => {
     const query = (ctx.match as string)?.trim();
     if (!query) return ctx.reply('Usage: <code>/testsearch &lt;your query&gt;</code>', { parse_mode: 'HTML' });
 
-    await ctx.reply(`🔍 Searching for: <code>${query}</code>…`, { parse_mode: 'HTML' });
+    const count = aiService.getDocCount();
+    if (count === 0) return ctx.reply('⚠️ Knowledge base is empty. Use /adddoc first.');
+
+    await ctx.reply(`🔍 Searching <b>${count} chunks</b> for: <code>${query}</code>…`, { parse_mode: 'HTML' });
+
     try {
-      // Access vectorStore via a direct search test
-      const testMsg = `[Context: User is test]\n${query}`;
-      const clean = testMsg.replace(/^\[Context:[^\]]*\]\n?/i, '').trim();
+      const results = await aiService.searchDocs(query, 5, ['astarter_deck', 'manual']);
 
-      // Use the AI service to do a raw addDocument/search cycle
-      const count = aiService.getDocCount();
-      if (count === 0) return ctx.reply('⚠️ Knowledge base is empty. Use /adddoc first.');
+      if (results.length === 0) {
+        return ctx.reply(
+          '❌ <b>No chunks found</b> for this query.\n\n' +
+          'The document may not be indexed or similarity is too low.\n' +
+          'Try <code>/docstats</code> to check KB status.',
+          { parse_mode: 'HTML' }
+        );
+      }
 
-      await ctx.reply(
-        `📚 Knowledge base has <b>${count} chunks</b>.\n\n` +
-        `Run <code>/ask ${query}</code> to test a real AI response from your data.`,
+      const lines = results.map((r, i) => {
+        const score = r.score.toFixed(3);
+        const threshold = r.score >= 0.35 ? '✅' : '❌ below threshold';
+        const preview = r.pageContent.slice(0, 120).replace(/\n/g, ' ');
+        const type = r.metadata?.type ?? 'unknown';
+        return `<b>#${i + 1}</b> score: <code>${score}</code> ${threshold} [${type}]\n<i>${preview}…</i>`;
+      });
+
+      return ctx.reply(
+        `📊 <b>Top ${results.length} results</b> (threshold: 0.35):\n\n` + lines.join('\n\n'),
         { parse_mode: 'HTML' }
       );
     } catch (err: any) {

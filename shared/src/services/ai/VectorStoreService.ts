@@ -160,8 +160,33 @@ export class VectorStoreService {
     }
 
     async addDocuments(text: string, metadata: any = {}): Promise<{ indexed: number; failed: number }> {
-        // Simple chunking: split by paragraphs
-        const chunks = text.split(/\n\n+/).filter(c => c.trim().length > 0);
+        // Smart chunking:
+        // 1. Split on double newlines first (paragraph boundaries)
+        // 2. Any remaining chunk > 800 chars (no double newlines — e.g. X posts, dense paragraphs)
+        //    gets split further on single newlines or sentences
+        const MAX_CHUNK = 800;
+        const rawChunks = text.split(/\n\n+/).filter(c => c.trim().length > 0);
+        const chunks: string[] = [];
+
+        for (const raw of rawChunks) {
+            if (raw.length <= MAX_CHUNK) {
+                chunks.push(raw.trim());
+            } else {
+                // Try splitting on single newlines first
+                const lines = raw.split(/\n/).filter(l => l.trim().length > 0);
+                let current = '';
+                for (const line of lines) {
+                    if ((current + ' ' + line).length > MAX_CHUNK && current.length > 0) {
+                        chunks.push(current.trim());
+                        current = line;
+                    } else {
+                        current = current ? current + ' ' + line : line;
+                    }
+                }
+                if (current.trim().length > 0) chunks.push(current.trim());
+            }
+        }
+
         let indexed = 0;
         let failed = 0;
 
