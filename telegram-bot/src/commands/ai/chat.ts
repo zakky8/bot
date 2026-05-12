@@ -49,6 +49,13 @@ function detectLinkRequest(message: string): { url: string; label: string } | nu
       return { url: entry.url, label: entry.label };
     }
   }
+
+  // Catch-all: short "X links" queries not matched above (e.g. "astarter links",
+  // "official links") → linktree has the complete up-to-date list
+  if (wordCount <= 5 && /\blinks?\b/.test(lower)) {
+    return { url: 'https://linktr.ee/Astarter', label: 'All Official Links' };
+  }
+
   return null;
 }
 
