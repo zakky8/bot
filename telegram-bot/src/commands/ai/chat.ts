@@ -7,6 +7,16 @@ import { isAdminOrOwner } from '../../utils/permissions';
 // Keyed by lowercase keywords. Matched before the AI is called, so the correct
 // URL is always returned regardless of what the model might hallucinate.
 const LINK_LOOKUP: Array<{ keywords: string[]; url: string; label: string }> = [
+  // ── Partner links — must come BEFORE generic keywords (e.g. 'mulan website' must not match the generic 'website' entry)
+  { keywords: ['mulan website', 'mulan web', 'mulan link', 'mulan url', 'mulan.meme', 'mulan site'],
+    url: 'https://mulan.meme', label: 'MULAN' },
+  { keywords: ['paygo website', 'paygo link', 'paygo url', 'paygo web', 'paygo site'],
+    url: 'https://www.paygo.ac', label: 'PayGo' },
+  { keywords: ['zeus website', 'zeus link', 'zeus url', 'zeus web', 'zeus network link', 'zeus network site'],
+    url: 'https://zeusnetwork.xyz', label: 'Zeus Network' },
+  { keywords: ['eni website', 'eniac website', 'eni link', 'eniac link', 'eni url', 'eniac url', 'eniac web'],
+    url: 'https://eniac.network', label: 'ENI / ENIAC' },
+  // ── Astarter official links
   { keywords: ['gitbook', 'docs', 'documentation', 'whitepaper', 'guide', 'wiki', 'manual'],
     url: 'https://astarter.gitbook.io/astarter', label: 'Gitbook / Docs' },
   { keywords: ['website', 'homepage', 'web site', 'official site'],
