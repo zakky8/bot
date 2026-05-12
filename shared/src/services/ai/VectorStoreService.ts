@@ -127,7 +127,8 @@ export class VectorStoreService {
             normA += vecA[i] * vecA[i];
             normB += vecB[i] * vecB[i];
         }
-        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+        const denom = Math.sqrt(normA) * Math.sqrt(normB);
+        return denom === 0 ? 0 : dotProduct / denom;
     }
 
     /**
@@ -289,7 +290,7 @@ export class VectorStoreService {
     }
 
     async removeBySource(sourceName: string) {
-        this.docs = this.docs.filter(doc => doc.metadata.source !== sourceName);
+        this.docs = this.docs.filter(doc => doc.metadata?.source !== sourceName);
         await this.persist();
     }
 

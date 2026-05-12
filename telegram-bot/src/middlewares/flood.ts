@@ -6,6 +6,14 @@ import { createLogger } from '../core/logger';
 const logger = createLogger('FloodMiddleware');
 const floodTrack = new Map<string, number[]>();
 
+// Purge entries that haven't had activity in the last 10 minutes to prevent unbounded memory growth
+setInterval(() => {
+  const cutoff = Date.now() - 10 * 60 * 1000;
+  for (const [key, timestamps] of floodTrack) {
+    if (timestamps.every(ts => ts < cutoff)) floodTrack.delete(key);
+  }
+}, 5 * 60 * 1000);
+
 export const floodMiddleware = async (ctx: BotContext, next: NextFunction) => {
   if (!ctx.chat || ctx.chat.type === 'private' || !ctx.from) return next();
   
@@ -44,7 +52,9 @@ export const floodMiddleware = async (ctx: BotContext, next: NextFunction) => {
       
       await ctx.deleteMessage().catch(() => {});
       return; 
-    } catch (e) {}
+    } catch (e) {
+      logger.error(`Flood action failed for user ${userId}: ${e}`);
+    }
   }
 
   return next();

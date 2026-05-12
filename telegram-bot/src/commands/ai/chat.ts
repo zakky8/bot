@@ -39,6 +39,14 @@ function filterOutput(response: string): string {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Parse HUMAN_MODERATOR_CHAT_ID safely — returns undefined if env var is missing or not a valid integer. */
+function getModChatId(): number | undefined {
+  const raw = process.env.HUMAN_MODERATOR_CHAT_ID;
+  if (!raw) return undefined;
+  const n = parseInt(raw, 10);
+  return Number.isNaN(n) ? undefined : n;
+}
+
 export default (bot: Bot<BotContext>) => {
   /**
    * Common AI Chat Handler
@@ -73,10 +81,10 @@ export default (bot: Bot<BotContext>) => {
           }
         );
 
-        const modChatId = process.env.HUMAN_MODERATOR_CHAT_ID;
-        if (modChatId) {
+        const modId = getModChatId();
+        if (modId) {
           await ctx.api.sendMessage(
-            parseInt(modChatId, 10),
+            modId,
             `🆘 <b>AI Escalation</b>\nUser: <code>${userId}</code>\nMsg: ${message.slice(0, 400)}`,
             { parse_mode: 'HTML' }
           ).catch(() => {});
@@ -134,6 +142,11 @@ export default (bot: Bot<BotContext>) => {
       text = text.replace(/\n{3,}/g, '\n\n').trim();
       // ─────────────────────────────────────────────────────────────────────────
 
+      // Final guard: if transformations somehow produced an empty string, fall back
+      if (!text) {
+        text = 'You can find all official Astarter links at <a href="https://linktr.ee/Astarter">linktr.ee/Astarter</a> 🔗';
+      }
+
       // In groups the reply already quotes the user's message (reply_parameters).
       // No need to prepend username — AI addresses them naturally in the response.
       // But ensure any @handle the AI put at the very top (as a bare line) is stripped
@@ -163,7 +176,7 @@ export default (bot: Bot<BotContext>) => {
         }
         if (current.trim()) chunks.push(current.trim());
         for (const chunk of chunks) {
-          await ctx.reply(chunk, replyOpts);
+          if (chunk) await ctx.reply(chunk, replyOpts);
         }
       } else {
         await ctx.reply(text, replyOpts);
@@ -172,11 +185,11 @@ export default (bot: Bot<BotContext>) => {
       console.error('AI Error:', error);
 
       // Send real error details to mod chat so issues can be diagnosed
-      const modChatId = process.env.HUMAN_MODERATOR_CHAT_ID;
-      if (modChatId) {
+      const modId = getModChatId();
+      if (modId) {
         const errMsg = error?.message ?? String(error);
         ctx.api.sendMessage(
-          parseInt(modChatId, 10),
+          modId,
           `⚠️ <b>AI Error</b>\nUser: <code>${ctx.from?.id}</code> (${ctx.from?.username ?? ctx.from?.first_name})\nMsg: ${message?.slice(0, 200)}\nError: <code>${errMsg.slice(0, 400)}</code>`,
           { parse_mode: 'HTML' }
         ).catch(() => {});
@@ -226,10 +239,10 @@ export default (bot: Bot<BotContext>) => {
 
     await ctx.reply('✅ <b>Support request sent!</b>\nA moderator will assist you shortly.', { parse_mode: 'HTML' });
 
-    const modChatId = process.env.HUMAN_MODERATOR_CHAT_ID;
-    if (modChatId) {
+    const modId = getModChatId();
+    if (modId) {
       await ctx.api.sendMessage(
-        parseInt(modChatId, 10),
+        modId,
         `🆘 <b>SUPPORT REQUEST</b>\nUser: <code>${ctx.from?.id}</code>\nIssue: ${message}`,
         { parse_mode: 'HTML' }
       ).catch(() => {});
