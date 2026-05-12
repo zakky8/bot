@@ -111,9 +111,11 @@ const MAX_INPUT_LENGTH = 1000;
 const ALLOWED_URLS = new Set([
   // Astarter official channels
   'https://www.astarter.io',
+  'https://astarter.gitbook.io',
   'https://t.me/AstarterDefiHubOfficial',
   'https://t.me/Astarteranncmnt',
   'https://x.com/AstarterDefiHub',
+  'https://twitter.com/AstarterDefiHub',
   'https://discord.gg/XXDEjFPrgR',
   'https://medium.com/@AstarterDefiHub',
   'https://www.reddit.com/r/Astarter/',
@@ -306,6 +308,7 @@ export class AIService {
 
     const OFFICIAL_LINKS = `OFFICIAL ASTARTER LINKS (only share these exact URLs, never others):
 🖥 Website: https://www.astarter.io
+📘 Docs / Gitbook: https://astarter.gitbook.io/astarter
 🪐 TG Community: https://t.me/AstarterDefiHubOfficial
 🎙 TG Announcements: https://t.me/Astarteranncmnt
 🗣 Twitter/X: https://x.com/AstarterDefiHub
@@ -862,6 +865,11 @@ Detect the language from the user's message and reply 100% in that language. Ara
 
     // 7. Sanitize output — strip any URL not in the allowed list
     response.content = this.sanitizeOutput(response.content);
+
+    // 7b. Guard against empty response after sanitization (e.g. reply was only a stripped URL)
+    if (!response.content.trim()) {
+      response.content = "I don't have that link confirmed right now — you can find all official Astarter links at https://linktr.ee/Astarter 🔗";
+    }
 
     // 8. Handle escalation signal — check loosely so punctuation/whitespace variants still match
     if (/^ESCALATE[.!]?\s*$/i.test(response.content.trim())) {
