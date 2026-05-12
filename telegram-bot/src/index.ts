@@ -19,6 +19,7 @@ import { errorHandler } from './middlewares/errorHandler';
 import { locksMiddleware } from './middlewares/locks';
 import { floodMiddleware } from './middlewares/flood';
 import { contentMiddleware } from './middlewares/content';
+import { groupWhitelistMiddleware, registerBotMemberHandler } from './middlewares/groupWhitelist';
 import { BotContext, SessionData } from './types';
 import { isBotAdmin } from './utils/permissions';
 
@@ -84,13 +85,18 @@ bot.use(i18n);
 bot.use(loggingMiddleware);
 bot.use(userTrackerMiddleware);
 
-// Auth middleware handles DM access control — no pre-filter needed here
+// Group whitelist — must run before auth so unauthorized groups are silently dropped
+bot.use(groupWhitelistMiddleware);
 
+// Auth middleware handles DM access control
 bot.use(authMiddleware);
 bot.use(locksMiddleware);
 bot.use(floodMiddleware);
 bot.use(contentMiddleware);
 bot.use(rateLimitMiddleware);
+
+// Register bot-added-to-group handler (leaves unauthorized groups)
+registerBotMemberHandler(bot);
 
 // Load commands
 async function loadCommands() {

@@ -194,13 +194,14 @@ export default (bot: Bot<BotContext>) => {
 
   // Remove auto-chat logic. AI now only responds via /ask command.
   
-  bot.command('ask', async (ctx) => {
+  // /ask and /ai are identical — both trigger the AI chat handler
+  const askHandler = async (ctx: BotContext) => {
     // DMs: auth middleware already guards this — but double-check for safety
     if (ctx.chat?.type === 'private' && !(await isAdminOrOwner(ctx))) return;
 
     const message = (ctx.match as string)?.trim();
     if (!message) {
-      return ctx.reply(`💬 Usage: <code>/ask &lt;message&gt;</code>`, { parse_mode: 'HTML' });
+      return ctx.reply(`💬 Usage: <code>/ask &lt;your question&gt;</code>`, { parse_mode: 'HTML' });
     }
 
     if (message.toLowerCase() === 'clear') {
@@ -211,7 +212,10 @@ export default (bot: Bot<BotContext>) => {
     }
 
     await handleAiChat(ctx, message);
-  });
+  };
+
+  bot.command('ask', askHandler);
+  bot.command('ai', askHandler);
 
   bot.command('support', async (ctx) => {
     // Support command remains for everyone to reach mods
