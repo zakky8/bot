@@ -406,7 +406,8 @@ ${faqBlock
 ${OFFICIAL_LINKS}
 
 LINK RULE:
-• Share a link ONLY when the user explicitly asks for it ("send me the link", "what's the website", "where's the discord").
+• Share a link ONLY when the user explicitly asks for it ("send me the link", "what's the website", "where's the discord", "give me the gitbook").
+• The Gitbook/docs link (https://astarter.gitbook.io/astarter) is ONLY for when the user specifically asks for documentation, the gitbook, or a docs link. Do NOT include it in general answers about Astarter.
 • For uncertainty responses: no links — just the honest "I don't know" pattern above.
 • For contact/partnership/listing questions: email only → <code>contact@astarter.io</code>
 • NEVER append links to the end of factual answers or follow-up closers.
