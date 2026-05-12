@@ -3,6 +3,55 @@ import { BotContext } from '../../types';
 import { aiService } from '../../core/ai';
 import { isAdminOrOwner } from '../../utils/permissions';
 
+// ── Deterministic link lookup — bypasses AI for simple link requests ──────────
+// Keyed by lowercase keywords. Matched before the AI is called, so the correct
+// URL is always returned regardless of what the model might hallucinate.
+const LINK_LOOKUP: Array<{ keywords: string[]; url: string; label: string }> = [
+  { keywords: ['gitbook', 'docs', 'documentation', 'whitepaper', 'guide', 'wiki', 'manual'],
+    url: 'https://astarter.gitbook.io/astarter', label: 'Gitbook / Docs' },
+  { keywords: ['website', 'homepage', 'web site', 'official site'],
+    url: 'https://www.astarter.io', label: 'Website' },
+  { keywords: ['discord'],
+    url: 'https://discord.gg/XXDEjFPrgR', label: 'Discord' },
+  { keywords: ['announcement', 'announce', 'ann channel', 'news channel'],
+    url: 'https://t.me/Astarteranncmnt', label: 'Announcements Channel' },
+  { keywords: ['telegram community', 'tg community', 'community group', 'community chat', 'tg group'],
+    url: 'https://t.me/AstarterDefiHubOfficial', label: 'Telegram Community' },
+  { keywords: ['twitter', ' x link', 'x account', 'tweet'],
+    url: 'https://x.com/AstarterDefiHub', label: 'Twitter / X' },
+  { keywords: ['medium', 'blog'],
+    url: 'https://medium.com/@AstarterDefiHub', label: 'Medium' },
+  { keywords: ['reddit'],
+    url: 'https://www.reddit.com/r/Astarter/', label: 'Reddit' },
+  { keywords: ['youtube', 'yt link', 'video channel'],
+    url: 'https://youtube.com/c/astartertv', label: 'YouTube' },
+  { keywords: ['zealy', 'quest', 'tasks'],
+    url: 'https://zealy.io/cw/astarterdefihub/leaderboard', label: 'Zealy' },
+  { keywords: ['linktree', 'all links', 'all socials', 'every link', 'social media'],
+    url: 'https://linktr.ee/Astarter', label: 'All Official Links' },
+];
+
+// Returns a match only when the message is clearly asking FOR a specific link —
+// not when the user is asking ABOUT something that mentions a platform name.
+function detectLinkRequest(message: string): { url: string; label: string } | null {
+  const lower = message.toLowerCase().trim();
+
+  // Must contain a link-intent signal — either an explicit request word or be very short (≤5 words)
+  const wordCount = lower.split(/\s+/).length;
+  const hasLinkIntent =
+    /\b(link|url|website|site|page|channel|account|address|give|send|share|where)\b/.test(lower) ||
+    wordCount <= 5;
+
+  if (!hasLinkIntent) return null;
+
+  for (const entry of LINK_LOOKUP) {
+    if (entry.keywords.some(kw => lower.includes(kw))) {
+      return { url: entry.url, label: entry.label };
+    }
+  }
+  return null;
+}
+
 // ── Layer 4: Output guard — identity confessions + wrong links ────────────────
 
 const EXPLICIT_CONFESSION_PATTERNS = [
@@ -14,22 +63,16 @@ const EXPLICIT_CONFESSION_PATTERNS = [
   /my (training|knowledge) cutoff (is|was)/i,
 ];
 
-// Wrong/outdated links that must never appear in responses.
-// Maps pattern → correct replacement URL.
 const BANNED_LINK_REPLACEMENTS: Array<[RegExp, string]> = [
-  // Old defunct docs domain → Linktree
   [/https?:\/\/docs\.astarter\.io\S*/gi, 'https://linktr.ee/Astarter'],
-  // Old wrong announcement link (lowercase 'a')
   [/https?:\/\/t\.me\/astarteranncmnt(?!\w)/gi, 'https://t.me/Astarteranncmnt'],
 ];
 
 function filterOutput(response: string): string {
-  // 1. Identity confession guard
   if (EXPLICIT_CONFESSION_PATTERNS.some(p => p.test(response))) {
     console.warn('[OutputGuard] Explicit identity confession caught — replacing.');
     return `I'm ${process.env.BOT_NAME || 'your Astarter assistant'}! What can I help you with today? 😊`;
   }
-  // 2. Replace banned/wrong links with correct ones
   let text = response;
   for (const [pattern, replacement] of BANNED_LINK_REPLACEMENTS) {
     text = text.replace(pattern, replacement);
@@ -64,6 +107,22 @@ export default (bot: Bot<BotContext>) => {
       const replyToId = ctx.message?.message_id; // for reply-to-message in groups
 
       await ctx.replyWithChatAction('typing');
+
+      // ── Deterministic link lookup — resolve before hitting the AI ────────────
+      // Eliminates hallucinated/wrong URLs for simple "give me the X link" queries.
+      const linkMatch = detectLinkRequest(message);
+      if (linkMatch) {
+        const replyOpts = {
+          parse_mode: 'HTML' as const,
+          ...(isGroup && replyToId ? { reply_parameters: { message_id: replyToId } } : {}),
+        };
+        await ctx.reply(
+          `Here's the Astarter <b>${linkMatch.label}</b>:\n${linkMatch.url}`,
+          replyOpts,
+        );
+        return;
+      }
+      // ─────────────────────────────────────────────────────────────────────────
 
       const context = await aiService.getConversationContext(userId, chatId, 'telegram');
 
