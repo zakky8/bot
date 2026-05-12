@@ -90,9 +90,36 @@ const INJECTION_PHRASES: string[] = [
   'jailbreak',
   'reveal your system prompt',
   'what are your instructions',
+  'disregard your',
+  'override your',
+  'bypass your',
+  'new persona',
+  'pretend you are',
+  'roleplay as',
+  'system prompt:',
+  'your real instructions',
+  'developer mode',
+  'sudo mode',
+  'admin override',
+  'ignore safety',
+  'without restrictions',
 ];
 
 const MAX_INPUT_LENGTH = 1000;
+
+// Allowed URLs — the only links the bot is permitted to output
+const ALLOWED_URLS = new Set([
+  'https://www.astarter.io',
+  'https://t.me/AstarterDefiHubOfficial',
+  'https://t.me/Astarteranncmnt',
+  'https://x.com/AstarterDefiHub',
+  'https://discord.gg/XXDEjFPrgR',
+  'https://medium.com/@AstarterDefiHub',
+  'https://www.reddit.com/r/Astarter/',
+  'https://youtube.com/c/astartertv',
+  'https://zealy.io/cw/astarterdefihub/leaderboard',
+  'https://linktr.ee/Astarter',
+]);
 
 
 export class AIService {
@@ -338,7 +365,12 @@ You: ESCALATE
 # Links
 ${OFFICIAL_LINKS}
 
-Only share links when: (a) the user explicitly asks for a link/resource, or (b) the exact detail isn't confirmed yet — even if you gave a general timeframe (e.g. "Q2-Q3 2026") but the precise date/info isn't set — share the full official links block above so they can follow all channels. NEVER add links when the answer is fully and specifically confirmed. ONLY use URLs from the list above — never invent or guess any URL.
+STRICT LINK RULE — read carefully:
+• Share links ONLY when the user explicitly asks for a link, website, or social media handle (e.g. "send me the link", "what's the website", "where's the discord")
+• For "I don't know" or unconfirmed answers: say so plainly — NO links, NO "check the announcements channel" with a URL
+• For partnership / listing / contact questions: say "reach out to the team at <code>contact@astarter.io</code>" — email only, no link block
+• NEVER append links at the end of factual answers, uncertainty responses, or "anything else?" closers
+• ONLY use exact URLs from the list above — never guess, shorten, or invent any URL
 
 # Language
 Detect the language from the user's message and reply 100% in that language. Arabic, Turkish, Russian, Spanish, French, Chinese, Hindi, Indonesian, Portuguese, Vietnamese, Korean, Japanese, German, Italian — all supported. If ambiguous, use English. Each conversation is independent — never let one user's language affect another.`;
@@ -360,6 +392,26 @@ Detect the language from the user's message and reply 100% in that language. Ara
     }
 
     return truncated;
+  }
+
+
+  /**
+   * Output sanitizer — strips any URL from AI response that isn't in the ALLOWED_URLS set.
+   * Prevents hallucinated links from reaching users even if the prompt is bypassed.
+   */
+  private sanitizeOutput(text: string): string {
+    return text.replace(/https?:\/\/[^\s)>\]"']+/g, (url) => {
+      // Trim trailing punctuation that may have been captured
+      const clean = url.replace(/[.,;!?]+$/, '');
+      // Check if this URL starts with any allowed URL
+      for (const allowed of ALLOWED_URLS) {
+        if (clean === allowed || clean.startsWith(allowed)) {
+          return url; // keep as-is (with original trailing chars)
+        }
+      }
+      this.logger.warn(`Blocked unauthorized URL in AI output: ${clean}`);
+      return '';
+    });
   }
 
 
@@ -655,7 +707,18 @@ Detect the language from the user's message and reply 100% in that language. Ara
 
         // Pass 1: current project knowledge
         const deckRaw = await this.vectorStore.searchFiltered(ragQuery, 3, ['astarter_deck', 'manual']);
-        const deckHits = deckRaw.filter(h => h.score >= MIN_SCORE);
+        let deckHits = deckRaw.filter(h => h.score >= MIN_SCORE);
+
+        // CRAG: if zero authoritative hits, simplify query and retry once (corrective retrieval)
+        if (deckHits.length === 0 && ragQuery.length > 20) {
+            const shortQuery = ragQuery.split(/\s+/).slice(0, 5).join(' ');
+            const retryRaw = await this.vectorStore.searchFiltered(shortQuery, 3, ['astarter_deck', 'manual']);
+            const retryHits = retryRaw.filter(h => h.score >= MIN_SCORE - 0.05);
+            if (retryHits.length > 0) {
+                deckHits = retryHits;
+                this.logger.info(`CRAG retry: ${retryHits.length} hits with shortened query "${shortQuery}"`);
+            }
+        }
 
         // Pass 2: community chat — only when deck is sparse
         const histRaw = deckHits.length < 2
@@ -751,14 +814,17 @@ Detect the language from the user's message and reply 100% in that language. Ara
       }
     }
 
-    // 7. Handle escalation signal
-    if (response.content === 'ESCALATE') {
+    // 7. Sanitize output — strip any URL not in the allowed list
+    response.content = this.sanitizeOutput(response.content);
+
+    // 8. Handle escalation signal
+    if (response.content.trim() === 'ESCALATE') {
       response.isEscalation = true;
       response.content =
-        "I apologize, but I am specifically trained to assist with project-related inquiries. I cannot answer that question as it falls outside my current scope. Please contact a human moderator for further assistance.";
+        "I want to make sure you get the right help — let me flag this for a team member who can assist you further! 🙌";
     }
 
-    // 8. Persist context
+    // 9. Persist context
     if (options?.saveContext !== false) {
       const updated: ConversationContext = {
         ...context,
@@ -770,7 +836,7 @@ Detect the language from the user's message and reply 100% in that language. Ara
       await this.saveConversationContext(updated);
     }
 
-    // 9. Log usage
+    // 10. Log usage
     await this.logUsage(context, response);
 
     return response;
