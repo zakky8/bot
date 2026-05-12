@@ -15,9 +15,10 @@ export default (bot: Bot<BotContext>) => {
 
   // ── /addgroup ──────────────────────────────────────────────────────────────
   // Owner or bot admin can authorize a group.
-  // Usage:
-  //   Inside the group:  /addgroup          (adds current group)
-  //   From anywhere:     /addgroup -1001234567890  (adds by ID)
+  // Usage (in DM or anywhere):
+  //   /addgroup @username      — resolves username → chat ID automatically
+  //   /addgroup -1001234567890 — add by numeric ID
+  //   /addgroup                — inside a group, adds the current group
   bot.command('addgroup', async (ctx: BotContext) => {
     if (!isBotAdmin(ctx)) return denyAccess(ctx, true);
 
@@ -26,18 +27,38 @@ export default (bot: Bot<BotContext>) => {
     let targetTitle: string;
 
     if (arg && /^-?\d+$/.test(arg)) {
-      // ID provided explicitly
+      // Numeric ID provided
       targetId = arg;
       targetTitle = `Group ${arg}`;
+    } else if (arg) {
+      // Username provided (@username or plain username) — resolve via Telegram API
+      const username = arg.startsWith('@') ? arg : `@${arg}`;
+      try {
+        await ctx.reply(`🔍 Looking up <code>${username}</code>…`, { parse_mode: 'HTML' });
+        const chat = await ctx.api.getChat(username);
+        if (chat.type === 'private') {
+          return ctx.reply('⚠️ That username belongs to a private user, not a group.');
+        }
+        targetId = chat.id.toString();
+        targetTitle = (chat as any).title || username;
+      } catch (err: any) {
+        return ctx.reply(
+          `❌ <b>Could not find group:</b> <code>${username}</code>\n\n` +
+          `Make sure:\n• The bot is already a member of that group\n• The username is spelled correctly\n• Or use the numeric group ID instead: <code>/addgroup -100xxxxxxxxxx</code>`,
+          { parse_mode: 'HTML' }
+        );
+      }
     } else if (ctx.chat && ctx.chat.type !== 'private') {
-      // Inside a group — authorize the current group
+      // No argument — inside a group, authorize the current one
       targetId = ctx.chat.id.toString();
-      targetTitle = (ctx.chat as any).title || `Group ${targetId}`;
+      targetTitle = (ctx.chat as any).title || `Group ${ctx.chat.id}`;
     } else {
       return ctx.reply(
         '📝 <b>Usage:</b>\n' +
-        '• Run <code>/addgroup</code> inside the group you want to authorize\n' +
-        '• Or: <code>/addgroup &lt;groupId&gt;</code>',
+        '• <code>/addgroup @username</code> — authorize by group username\n' +
+        '• <code>/addgroup -100xxxxxxxxxx</code> — authorize by numeric group ID\n' +
+        '• Run <code>/addgroup</code> inside the group to authorize it directly\n\n' +
+        '<b>Tip:</b> To get a group\'s numeric ID, forward any message from it to @userinfobot',
         { parse_mode: 'HTML' }
       );
     }
