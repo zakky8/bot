@@ -301,16 +301,43 @@ export default (bot: Bot<BotContext>) => {
     // DMs: auth middleware already guards this — but double-check for safety
     if (ctx.chat?.type === 'private' && !(await isAdminOrOwner(ctx))) return;
 
-    const message = (ctx.match as string)?.trim();
-    if (!message) {
-      return ctx.reply(`💬 Usage: <code>/ask &lt;your question&gt;</code>`, { parse_mode: 'HTML' });
-    }
+    const typedText = (ctx.match as string)?.trim();
 
-    if (message.toLowerCase() === 'clear') {
+    // clear must match only explicitly typed text, never a replied message
+    if (typedText?.toLowerCase() === 'clear') {
       const userId = ctx.from?.id?.toString() || 'unknown';
       const chatId = ctx.chat?.id?.toString();
       await aiService.clearConversationContext(userId, chatId, 'telegram');
       return ctx.reply('🗑️ Conversation history cleared.');
+    }
+
+    let message = typedText;
+
+    // Reply-to support: /ai sent as a reply to another message
+    const repliedMsg = ctx.message?.reply_to_message;
+    if (repliedMsg) {
+      const repliedText = (repliedMsg.text || repliedMsg.caption || '').trim();
+      if (!repliedText) {
+        return ctx.reply(
+          '💬 That message has no text. Reply to a text message or type your question after <code>/ai</code>.',
+          { parse_mode: 'HTML' }
+        );
+      }
+      const safeRepliedText = repliedText.slice(0, 1000);
+      if (!message) {
+        // /ai with no extra text — use the replied message as the question
+        message = safeRepliedText;
+      } else {
+        // /ai <question> as a reply — use replied message as additional context
+        message = `${message}\n\n[Referring to: "${safeRepliedText}"]`;
+      }
+    }
+
+    if (!message) {
+      return ctx.reply(
+        `💬 Usage: <code>/ask &lt;your question&gt;</code> or reply to any message with <code>/ask</code>`,
+        { parse_mode: 'HTML' }
+      );
     }
 
     await handleAiChat(ctx, message);
