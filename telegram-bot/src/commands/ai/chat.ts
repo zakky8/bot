@@ -184,10 +184,11 @@ export default (bot: Bot<BotContext>) => {
         return;
       }
 
-      // ── Language memory ────────────────────────────────────────────────────
+      // ── Language detection — only tag the current message's language ─────
+      // Do NOT pull stored language from Redis — that would cause the bot to
+      // reply in Russian/Arabic/etc. on all future messages after one non-Latin message.
       const detectedLang = detectScript(message);
       if (detectedLang) aiService.setUserLang(userId, detectedLang).catch(() => {});
-      const storedLang = detectedLang ?? await aiService.getUserLang(userId).catch(() => null);
 
       // ── Step 1: instant acknowledgment so user knows the bot received the message ──
       const statusMsg = await ctx.reply('🔍 <i>Looking into that...</i>', {
@@ -198,7 +199,7 @@ export default (bot: Bot<BotContext>) => {
 
       // ── Step 2: fetch AI response ────────────────────────────────────────
       const context = await aiService.getConversationContext(userId, chatId, 'telegram');
-      const langTag = storedLang ? ` | Language: ${storedLang}` : '';
+      const langTag = detectedLang ? ` | Language: ${detectedLang}` : '';
       const userMsgWithMention = `[Context: User is ${username}${langTag}]\n${message}`;
 
       const response = await aiService.chat(context, userMsgWithMention);
