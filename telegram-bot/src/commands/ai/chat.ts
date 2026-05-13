@@ -112,6 +112,11 @@ function escapeTelegramHtml(text: string): string {
 function formatForTelegram(raw: string): string {
   let text = raw;
 
+  // 0. Escape bare ampersands that aren't already HTML entities.
+  //    Must run BEFORE tag processing. We only escape & here — not < or > — because
+  //    the AI outputs <b>/<code>/<i> tags directly and the formatter handles the rest.
+  text = text.replace(/&(?!(?:#\d+|#x[\da-f]+|[a-z]{1,10});)/gi, '&amp;');
+
   // 1. Convert markdown links [text](url) → <a href="url">text</a>
   text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2">$1</a>');
 

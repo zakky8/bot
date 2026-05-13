@@ -113,7 +113,7 @@ const ALLOWED_URLS = new Set([
   'https://www.astarter.io',
   'https://astarter.gitbook.io',
   'https://t.me/AstarterDefiHubOfficial',
-  'https://https://t.me/Astarteranncmnt',
+  'https://t.me/Astarteranncmnt',
   'https://x.com/AstarterDefiHub',
   'https://twitter.com/AstarterDefiHub',
   'https://discord.gg/XXDEjFPrgR',
