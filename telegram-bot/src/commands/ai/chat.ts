@@ -230,8 +230,8 @@ export default (bot: Bot<BotContext>) => {
         ]],
       };
 
-      // Append feedback prompt so users know the buttons are for rating, not answering
-      const textWithFeedback = text + '\n\n<i>Was this helpful?</i>';
+      // Buttons are labelled Helpful / Not helpful — no extra label needed in the text
+      const textWithFeedback = text;
 
       if (textWithFeedback.length > 4000) {
         // Too long for one message — delete status and send as chunks
