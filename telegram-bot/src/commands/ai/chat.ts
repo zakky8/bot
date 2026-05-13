@@ -141,14 +141,14 @@ export default (bot: Bot<BotContext>) => {
    * Common AI Chat Handler
    */
   const handleAiChat = async (ctx: BotContext, message: string, mentionPrefix = '') => {
+    const userId = ctx.from?.id?.toString() || 'unknown';
+    const chatId = ctx.chat?.id?.toString();
     try {
       // Check if AI is enabled for this chat
       if (ctx.chat?.type !== 'private' && ctx.session.aiEnabled === false) {
         return; // Silent ignore if disabled in groups
       }
 
-      const userId = ctx.from?.id?.toString() || 'unknown';
-      const chatId = ctx.chat?.id?.toString();
       const username = ctx.from?.username ? `@${ctx.from.username}` : (ctx.from?.first_name || 'User');
       const isGroup = ctx.chat?.type !== 'private';
       const replyToId = ctx.message?.message_id;
