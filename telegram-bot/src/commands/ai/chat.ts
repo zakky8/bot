@@ -163,7 +163,6 @@ export default (bot: Bot<BotContext>) => {
   const handleAiChat = async (ctx: BotContext, message: string, mentionPrefix = '') => {
     const userId = ctx.from?.id?.toString() || 'unknown';
     const chatId = ctx.chat?.id?.toString();
-    let placeholderMsgId: number | null = null;
 
     try {
       if (ctx.chat?.type !== 'private' && ctx.session.aiEnabled === false) return;
@@ -188,20 +187,12 @@ export default (bot: Bot<BotContext>) => {
       if (detectedLang) aiService.setUserLang(userId, detectedLang).catch(() => {});
       const storedLang = detectedLang ?? await aiService.getUserLang(userId).catch(() => null);
 
-      // ── Send placeholder and start streaming ─────────────────────────────
-      const placeholder = await ctx.reply('▌', { ...(isGroup && replyToId ? { reply_parameters: { message_id: replyToId } } : {}) });
-      placeholderMsgId = placeholder.message_id;
-
-      // Token buffer — written by onChunk synchronously, read by the interval ticker
-      let buffer = '';
-      const EDIT_INTERVAL = 1200; // ms between Telegram edits
-
-      // Interval fires every 1200ms regardless of stream speed — no blocking in the hot path
-      const ticker = setInterval(() => {
-        if (!placeholderMsgId || buffer.length < 10) return;
-        const preview = buffer.slice(0, 3900) + ' ▌';
-        ctx.api.editMessageText(ctx.chat!.id, placeholderMsgId, preview).catch(() => {});
-      }, EDIT_INTERVAL);
+      // ── Show native Telegram typing indicator ────────────────────────────
+      // Refreshed every 4s — Telegram auto-hides it after 5s if not renewed
+      await ctx.replyWithChatAction('typing').catch(() => {});
+      const typingTicker = setInterval(() => {
+        ctx.replyWithChatAction('typing').catch(() => {});
+      }, 4000);
 
       const context = await aiService.getConversationContext(userId, chatId, 'telegram');
       const langTag = storedLang ? ` | Language: ${storedLang}` : '';
@@ -209,19 +200,17 @@ export default (bot: Bot<BotContext>) => {
 
       let response;
       try {
-        response = await aiService.chatStream(context, userMsgWithMention, (chunk) => {
-          buffer += chunk; // synchronous — never blocks the stream
+        response = await aiService.chatStream(context, userMsgWithMention, (_chunk) => {
+          // buffer not needed — we send one final message when complete
         });
       } finally {
-        clearInterval(ticker);
+        clearInterval(typingTicker);
       }
 
-      // ── Escalation ────────────────────────────────────────────────────────
       if (!response) throw new Error('Stream returned no response');
 
+      // ── Escalation ────────────────────────────────────────────────────────
       if (response.isEscalation) {
-        await ctx.api.deleteMessage(ctx.chat!.id, placeholderMsgId!).catch(() => {});
-        placeholderMsgId = null;
         await ctx.reply(
           '🔔 <b>Connecting you to a human moderator</b>\n\nI could not find the answer in my knowledge base. A support agent has been notified.',
           { parse_mode: 'HTML', ...(isGroup && replyToId ? { reply_parameters: { message_id: replyToId } } : {}) }
@@ -233,18 +222,14 @@ export default (bot: Bot<BotContext>) => {
         return;
       }
 
-      // ── Format final text ────────────────────────────────────────────────
+      // ── Format and send final answer ─────────────────────────────────────
       let text = filterOutput(response.content);
       text = formatForTelegram(text);
       if (!text) text = 'You can find all official Astarter links at <a href="https://linktr.ee/Astarter">linktr.ee/Astarter</a> 🔗';
       if (isGroup) text = text.replace(/^@[\w]+\s*\n/, '');
       if (mentionPrefix) text = `${mentionPrefix}\n${text}`;
 
-      // ── Edit placeholder with final HTML-formatted text ──────────────────
       if (text.length > 4000) {
-        // Too long to edit — delete placeholder, send as chunks
-        await ctx.api.deleteMessage(ctx.chat!.id, placeholderMsgId!).catch(() => {});
-        placeholderMsgId = null;
         const chunks: string[] = [];
         let current = '';
         for (const line of text.split('\n')) {
@@ -257,11 +242,7 @@ export default (bot: Bot<BotContext>) => {
           if (chunk) await ctx.reply(chunk, replyOpts);
         }
       } else {
-        await ctx.api.editMessageText(ctx.chat!.id, placeholderMsgId!, text, { parse_mode: 'HTML' }).catch(async () => {
-          // Fallback: if edit fails, send as new message
-          await ctx.reply(text, replyOpts).catch(() => {});
-        });
-        placeholderMsgId = null;
+        await ctx.reply(text, replyOpts);
       }
 
       // ── Feedback buttons ─────────────────────────────────────────────────
@@ -275,10 +256,6 @@ export default (bot: Bot<BotContext>) => {
       }).catch(() => {});
 
     } catch (error: any) {
-      // Clean up placeholder if it's still showing
-      if (placeholderMsgId && ctx.chat?.id) {
-        await ctx.api.deleteMessage(ctx.chat.id, placeholderMsgId).catch(() => {});
-      }
       console.error('AI Error:', error);
       const modId = getModChatId();
       if (modId) {
