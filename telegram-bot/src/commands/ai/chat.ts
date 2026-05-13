@@ -96,24 +96,55 @@ function detectScript(text: string): string | null {
 }
 
 // ── Telegram HTML formatter — converts AI output to Telegram-safe HTML ────────
+// Approach inspired by OpenClaw's format.ts: convert markdown first, then
+// preserve only supported Telegram HTML tags, strip the rest.
+
+/** Telegram-supported simple tags (no attributes needed) */
+const TG_SIMPLE_TAGS = new Set(['b', 'strong', 'i', 'em', 'u', 'ins', 's', 'strike', 'del', 'code', 'pre', 'tg-spoiler', 'blockquote']);
+
+/** Escape plain-text ampersands and angle brackets that aren't part of HTML tags */
+function escapeTelegramHtml(text: string): string {
+  return text.replace(/&(?!(?:#\d+|#x[\da-f]+|[a-z]{1,10});)/gi, '&amp;')
+             .replace(/</g, '&lt;')
+             .replace(/>/g, '&gt;');
+}
+
 function formatForTelegram(raw: string): string {
   let text = raw;
+
+  // 1. Convert markdown links [text](url) → <a href="url">text</a>
   text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2">$1</a>');
+
+  // 2. Convert markdown bold/italic before tag processing
+  text = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+  text = text.replace(/(?<![_\w])_(.*?)_(?![_\w])/g, '<i>$1</i>');
+
+  // 3. Normalise structural HTML → plain equivalents
   text = text.replace(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi, '<b>$1</b>\n');
+  text = text.replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, '<b>$1</b>');
+  text = text.replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, '<i>$1</i>');
   text = text.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, '• $1\n');
   text = text.replace(/<li[^>]*>/gi, '• ');
   text = text.replace(/<\/?[uo]l[^>]*>/gi, '\n');
   text = text.replace(/<p[^>]*>/gi, '');
   text = text.replace(/<\/p>/gi, '\n\n');
   text = text.replace(/<br\s*\/?>/gi, '\n');
-  text = text.replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, '<b>$1</b>');
-  text = text.replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, '<i>$1</i>');
+
+  // 4. Unwrap raw angle-bracket URLs like <https://...>
   text = text.replace(/<(https?:\/\/[^>]+)>/g, '$1');
-  const ALLOWED = ['b', 'i', 'u', 's', 'a', 'code', 'pre', 'tg-spoiler'];
-  const stripPattern = new RegExp(`<(?!\\/?(?:${ALLOWED.join('|')})(?:\\s[^>]*)?>)[^>]+>`, 'gi');
-  text = text.replace(stripPattern, '');
-  text = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
-  text = text.replace(/(?<![_\w])_(.*?)_(?![_\w])/g, '<i>$1</i>');
+
+  // 5. Strip any HTML tag that Telegram doesn't support.
+  //    Keep: simple tags from TG_SIMPLE_TAGS + <a href="...">
+  //    Inspired by OpenClaw's preserveSupportedTelegramHtmlTags logic.
+  text = text.replace(/<(\/?)([\w-]+)([^>]*)>/gi, (_match, slash: string, tag: string, attrs: string) => {
+    const lower = tag.toLowerCase();
+    if (TG_SIMPLE_TAGS.has(lower) && attrs.trim() === '') return `<${slash}${lower}>`;
+    if (lower === 'a' && !slash && /href="[^"]+"/i.test(attrs)) return `<a${attrs}>`;
+    if (lower === 'a' && slash) return '</a>';
+    return ''; // strip everything else
+  });
+
+  // 6. Collapse 3+ newlines → 2
   text = text.replace(/\n{3,}/g, '\n\n').trim();
   return text;
 }
