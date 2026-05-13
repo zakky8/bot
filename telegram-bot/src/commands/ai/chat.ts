@@ -223,17 +223,7 @@ export default (bot: Bot<BotContext>) => {
       if (isGroup) text = text.replace(/^@[\w]+\s*\n/, '');
       if (mentionPrefix) text = `${mentionPrefix}\n${text}`;
 
-      const feedbackMarkup = {
-        inline_keyboard: [[
-          { text: '👍 Helpful', callback_data: `fb_up:${userId}:${chatId ?? ''}` },
-          { text: '👎 Not helpful', callback_data: `fb_dn:${userId}:${chatId ?? ''}` },
-        ]],
-      };
-
-      // Buttons are labelled Helpful / Not helpful — no extra label needed in the text
-      const textWithFeedback = text;
-
-      if (textWithFeedback.length > 4000) {
+      if (text.length > 4000) {
         // Too long for one message — delete status and send as chunks
         await ctx.api.deleteMessage(ctx.chat!.id, statusMsgId).catch(() => {});
         let current = '';
@@ -244,22 +234,17 @@ export default (bot: Bot<BotContext>) => {
           else current = next;
         }
         if (current.trim()) chunks.push(current.trim());
-        for (let i = 0; i < chunks.length; i++) {
-          if (!chunks[i]) continue;
-          const isLast = i === chunks.length - 1;
-          const chunkText = isLast ? chunks[i] + '\n\n<i>Was this helpful?</i>' : chunks[i];
-          await ctx.reply(chunkText, { ...replyOpts, ...(isLast ? { reply_markup: feedbackMarkup } : {}) });
+        for (const chunk of chunks) {
+          if (!chunk) continue;
+          await ctx.reply(chunk, replyOpts);
         }
       } else {
-        // Edit status message → answer + feedback buttons in one message
-        const edited = await ctx.api.editMessageText(ctx.chat!.id, statusMsgId, textWithFeedback, {
+        const edited = await ctx.api.editMessageText(ctx.chat!.id, statusMsgId, text, {
           parse_mode: 'HTML',
-          reply_markup: feedbackMarkup,
         }).catch(() => null);
 
         if (!edited) {
-          // HTML parse failed — send as plain text fallback with feedback
-          await ctx.reply(textWithFeedback, { reply_markup: feedbackMarkup }).catch(() => {});
+          await ctx.reply(text, { parse_mode: 'HTML' }).catch(() => {});
         }
       }
 
@@ -336,24 +321,6 @@ export default (bot: Bot<BotContext>) => {
 
   bot.command('ask', askHandler);
   bot.command('ai', askHandler);
-
-  // ── Feedback callback handler ─────────────────────────────────────────────
-  bot.callbackQuery(/^fb_(up|dn):/, async (ctx) => {
-    try {
-      const [action, userId, chatId] = ctx.callbackQuery.data.split(':');
-      const helpful = action === 'fb_up';
-      await aiService.storeFeedback(userId, chatId || undefined, helpful).catch(() => {});
-      // Remove the buttons but keep the answer text untouched
-      await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => {});
-      // Show a brief toast popup — does NOT replace the message
-      await ctx.answerCallbackQuery({
-        text: helpful ? '👍 Thanks — glad that helped!' : '👎 Thanks for the feedback!',
-        show_alert: false,
-      });
-    } catch {
-      await ctx.answerCallbackQuery().catch(() => {});
-    }
-  });
 
   bot.command('support', async (ctx) => {
     // Support command remains for everyone to reach mods
