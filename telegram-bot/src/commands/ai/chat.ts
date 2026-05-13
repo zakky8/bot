@@ -260,15 +260,17 @@ export default (bot: Bot<BotContext>) => {
       text = formatForTelegram(text);
 
       // ── Announcements channel link injection ──────────────────────────────────
-      // Replace "announcements channel" in the text with a clickable inline link.
-      // Only runs if the URL isn't already present in the text.
+      // Always inject an inline <a> link on "announcements channel".
+      // Step 1: handle "announcements channel (https://...)" or "announcements channel https://..."
+      //         — AI sometimes appends the raw URL, which blocks the old conditional check.
+      // Step 2: clean up any remaining raw URL occurrences not inside an <a> href.
       const ANN_URL = 'https://t.me/Astarteranncmnt';
-      if (!text.includes(ANN_URL)) {
-        text = text.replace(
-          /announcements?\s*channel/gi,
-          `<a href="${ANN_URL}">announcements channel</a>`
-        );
-      }
+      text = text.replace(
+        /announcements?\s*channel(?:\s*\(?https?:\/\/t\.me\/Astarteranncmnt[^\s)]*\)?)?/gi,
+        `<a href="${ANN_URL}">announcements channel</a>`
+      );
+      // Strip any leftover raw URL that wasn't part of the pattern above
+      text = text.replace(/(?<!href=")https?:\/\/t\.me\/Astarteranncmnt\S*/gi, '');
       if (!text) text = 'You can find all official Astarter links at <a href="https://linktr.ee/Astarter">linktr.ee/Astarter</a> 🔗';
       if (isGroup) text = text.replace(/^@[\w]+\s*\n/, '');
       if (mentionPrefix) text = `${mentionPrefix}\n${text}`;
