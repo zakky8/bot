@@ -27,7 +27,7 @@ const LINK_LOOKUP: Array<{ keywords: string[]; url: string; label: string }> = [
     url: 'https://t.me/Astarteranncmnt', label: 'Announcements Channel' },
   { keywords: ['telegram community', 'tg community', 'community group', 'community chat', 'tg group'],
     url: 'https://t.me/AstarterDefiHubOfficial', label: 'Telegram Community' },
-  { keywords: ['twitter', ' x link', 'x account', 'tweet'],
+  { keywords: ['twitter', 'x link', 'x account', 'tweet'],
     url: 'https://x.com/AstarterDefiHub', label: 'Twitter / X' },
   { keywords: ['medium', 'blog'],
     url: 'https://medium.com/@AstarterDefiHub', label: 'Medium' },
@@ -205,19 +205,30 @@ export default (bot: Bot<BotContext>) => {
       }, 4000);
 
       // Ticker edits the live message with growing text on a fixed clock
+      let initialSending = false; // guard against concurrent initial sends
+      let streamDone = false;     // set true when stream resolves to stop in-flight sends
       const streamTicker = setInterval(async () => {
+        if (streamDone) return;
         const preview = buffer.slice(0, 4000).trimEnd();
         if (!preview) return;
 
         if (streamMsgId === null) {
           // Don't send anything until we have enough text to feel meaningful
-          if (preview.length < MIN_INITIAL_CHARS) return;
+          if (preview.length < MIN_INITIAL_CHARS || initialSending) return;
+          initialSending = true;
           try {
             const sent = await ctx.reply(preview, {
               ...(isGroup && replyToId ? { reply_parameters: { message_id: replyToId } } : {}),
             });
-            streamMsgId = sent.message_id;
-          } catch { /* will retry next tick */ }
+            if (!streamDone) {
+              streamMsgId = sent.message_id;
+            } else {
+              // Stream finished while we were sending — delete this orphan
+              ctx.api.deleteMessage(ctx.chat!.id, sent.message_id).catch(() => {});
+            }
+          } catch {
+            initialSending = false; // allow retry next tick
+          }
         } else {
           // Edit with more text — plain text during streaming (partial HTML would break)
           ctx.api.editMessageText(ctx.chat!.id, streamMsgId, preview).catch(() => {});
@@ -234,6 +245,7 @@ export default (bot: Bot<BotContext>) => {
           buffer += chunk; // synchronous accumulation — never blocks the stream
         });
       } finally {
+        streamDone = true; // tell any in-flight ticker callback to discard its send
         clearInterval(streamTicker);
         clearInterval(typingTicker);
       }

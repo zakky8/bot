@@ -122,6 +122,8 @@ const ALLOWED_URLS = new Set([
   'https://youtube.com/c/astartertv',
   'https://zealy.io/cw/astarterdefihub/leaderboard',
   'https://linktr.ee/Astarter',
+  // Partner links — MULAN
+  'https://mulan.meme',
   // Partner links — PayGo
   'https://www.paygo.ac',
   'https://x.com/PayGo402',
@@ -1071,17 +1073,37 @@ ${faqBlock
       inferenceConfig: { maxTokens: this.config.maxTokens || 800, temperature: 0.1, topP: 0.5 },
     });
 
-    const response = await this.bedrock.send(command);
-    let text = '';
-    for await (const event of response.stream!) {
-      const chunk = event.contentBlockDelta?.delta?.text;
-      if (chunk) {
-        text += chunk;
-        onChunk(chunk); // fire-and-forget — never block the stream loop
+    const RETRYABLE = new Set(['ThrottlingException', 'ServiceUnavailableException', 'InternalServerException', 'ModelTimeoutException']);
+    const MAX_ATTEMPTS = 3;
+    let lastErr: any;
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        const response = await this.bedrock.send(command);
+        let text = '';
+        for await (const event of response.stream!) {
+          const chunk = event.contentBlockDelta?.delta?.text;
+          if (chunk) {
+            text += chunk;
+            onChunk(chunk); // fire-and-forget — never block the stream loop
+          }
+        }
+        if (!text) throw new Error('AWS Bedrock stream returned no text');
+        return { text };
+      } catch (err: any) {
+        lastErr = err;
+        const code: string = err?.name ?? err?.code ?? '';
+        const isRetryable = RETRYABLE.has(code) || (err?.message ?? '').toLowerCase().includes('throttl');
+        if (isRetryable && attempt < MAX_ATTEMPTS) {
+          const delay = Math.pow(2, attempt) * 600;
+          this.logger.warn(`Bedrock stream throttled — retry ${attempt}/${MAX_ATTEMPTS - 1} in ${delay}ms`);
+          await this.sleep(delay);
+          continue;
+        }
+        throw err;
       }
     }
-    if (!text) throw new Error('AWS Bedrock stream returned no text');
-    return { text };
+    throw lastErr ?? new Error('AWS Bedrock stream: max retries exceeded');
   }
 
   /** Stream AI response, calling onChunk for every token. Returns the final AIResponse. */
@@ -1147,16 +1169,30 @@ ${faqBlock
       } else if (this.ollama) {
         const r = await this.generateWithOllama([{ role: 'system', content: dynamicPrompt }, ...messages], options?.model);
         fullText = r.content; provider = 'ollama'; usedModel = r.model;
-        await onChunk(r.content);
+        onChunk(r.content); // synchronous — onChunk is void, not async
       } else {
         throw new Error('No AI provider available.');
       }
     } catch (err: any) {
-      // Fallback to Bedrock if Anthropic fails
+      // Fallback chain: Anthropic → Bedrock → Ollama
       if (provider === 'anthropic' && this.bedrock) {
         this.logger.warn('Anthropic stream failed — falling back to Bedrock');
-        const r = await this.streamWithAWS(messages, dynamicPrompt, onChunk, options?.model);
-        fullText = r.text; provider = 'aws';
+        try {
+          const r = await this.streamWithAWS(messages, dynamicPrompt, onChunk, options?.model);
+          fullText = r.text; provider = 'aws';
+        } catch (bedrockErr) {
+          if (this.ollama) {
+            this.logger.warn('Bedrock stream also failed — falling back to Ollama');
+            const r = await this.generateWithOllama([{ role: 'system', content: dynamicPrompt }, ...messages], options?.model);
+            fullText = r.content; provider = 'ollama'; usedModel = r.model;
+            onChunk(r.content);
+          } else { throw bedrockErr; }
+        }
+      } else if (provider === 'aws' && this.ollama) {
+        this.logger.warn('Bedrock stream failed — falling back to Ollama');
+        const r = await this.generateWithOllama([{ role: 'system', content: dynamicPrompt }, ...messages], options?.model);
+        fullText = r.content; provider = 'ollama'; usedModel = r.model;
+        onChunk(r.content);
       } else { throw err; }
     }
 
