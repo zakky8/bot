@@ -1018,7 +1018,7 @@ ${faqBlock
   private async streamWithAnthropic(
     messages: AIMessage[],
     systemPrompt: string,
-    onChunk: (chunk: string) => Promise<void>,
+    onChunk: (chunk: string) => void,
     model?: string,
   ): Promise<{ text: string; tokensUsed: number }> {
     if (!this.anthropic) throw new Error('Anthropic not initialised');
@@ -1036,10 +1036,10 @@ ${faqBlock
     });
 
     let text = '';
-    for await (const chunk of stream.textStream) {
+    stream.on('text', (chunk: string) => {
       text += chunk;
-      await onChunk(chunk);
-    }
+      onChunk(chunk); // synchronous — never blocks the stream loop
+    });
     const final = await stream.finalMessage();
     return { text, tokensUsed: final.usage.input_tokens + final.usage.output_tokens };
   }
@@ -1047,11 +1047,13 @@ ${faqBlock
   private async streamWithAWS(
     messages: AIMessage[],
     systemPrompt: string,
-    onChunk: (chunk: string) => Promise<void>,
+    onChunk: (chunk: string) => void,
     model?: string,
   ): Promise<{ text: string }> {
     if (!this.bedrock) throw new Error('AWS Bedrock not initialised');
-    let modelToUse = model ?? this.config.defaultModel ?? 'openai.gpt-oss-20b-1:0';
+    let modelToUse = model ?? this.config.defaultModel;
+
+    if (!modelToUse) throw new Error('No model configured for AWS Bedrock');
 
     if (modelToUse.startsWith('anthropic.')) {
       const region = this.config.awsRegion ?? 'us-east-1';
@@ -1073,7 +1075,10 @@ ${faqBlock
     let text = '';
     for await (const event of response.stream!) {
       const chunk = event.contentBlockDelta?.delta?.text;
-      if (chunk) { text += chunk; await onChunk(chunk); }
+      if (chunk) {
+        text += chunk;
+        onChunk(chunk); // fire-and-forget — never block the stream loop
+      }
     }
     if (!text) throw new Error('AWS Bedrock stream returned no text');
     return { text };
@@ -1083,7 +1088,7 @@ ${faqBlock
   async chatStream(
     context: ConversationContext,
     userMessage: string,
-    onChunk: (chunk: string) => Promise<void>,
+    onChunk: (chunk: string) => void,
     options?: { model?: string; systemPrompt?: string; saveContext?: boolean },
   ): Promise<AIResponse> {
     const allowed = await this.checkRateLimit(context.userId);

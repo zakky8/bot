@@ -192,25 +192,33 @@ export default (bot: Bot<BotContext>) => {
       const placeholder = await ctx.reply('▌', { ...(isGroup && replyToId ? { reply_parameters: { message_id: replyToId } } : {}) });
       placeholderMsgId = placeholder.message_id;
 
+      // Token buffer — written by onChunk synchronously, read by the interval ticker
       let buffer = '';
-      let lastEdit = 0;
-      const EDIT_INTERVAL = 1200; // ms between intermediate edits
+      const EDIT_INTERVAL = 1200; // ms between Telegram edits
+
+      // Interval fires every 1200ms regardless of stream speed — no blocking in the hot path
+      const ticker = setInterval(() => {
+        if (!placeholderMsgId || buffer.length < 10) return;
+        const preview = buffer.slice(0, 3900) + ' ▌';
+        ctx.api.editMessageText(ctx.chat!.id, placeholderMsgId, preview).catch(() => {});
+      }, EDIT_INTERVAL);
 
       const context = await aiService.getConversationContext(userId, chatId, 'telegram');
       const langTag = storedLang ? ` | Language: ${storedLang}` : '';
       const userMsgWithMention = `[Context: User is ${username}${langTag}]\n${message}`;
 
-      const response = await aiService.chatStream(context, userMsgWithMention, async (chunk) => {
-        buffer += chunk;
-        const now = Date.now();
-        if (now - lastEdit >= EDIT_INTERVAL && buffer.length > 15) {
-          lastEdit = now;
-          // Intermediate: plain text + cursor (no HTML — partial markdown would break)
-          await ctx.api.editMessageText(ctx.chat!.id, placeholderMsgId!, buffer.slice(0, 3900) + ' ▌').catch(() => {});
-        }
-      });
+      let response;
+      try {
+        response = await aiService.chatStream(context, userMsgWithMention, (chunk) => {
+          buffer += chunk; // synchronous — never blocks the stream
+        });
+      } finally {
+        clearInterval(ticker);
+      }
 
       // ── Escalation ────────────────────────────────────────────────────────
+      if (!response) throw new Error('Stream returned no response');
+
       if (response.isEscalation) {
         await ctx.api.deleteMessage(ctx.chat!.id, placeholderMsgId!).catch(() => {});
         placeholderMsgId = null;
