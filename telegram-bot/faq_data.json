@@ -85,7 +85,7 @@
   },
   {
     "q": "What developer resources does Astarter offer? Is there an SDK or API?",
-    "a": "Astarter offers three developer resources (all going live at Mainnet Q2–Q3 2026):\n\n• <b>AI Agents Framework</b> — The open ABox agent framework (formerly known as OpenClaw). Lets developers build and deploy AI agents compatible with LangChain, AutoGPT, and major frameworks. Status: Mainnet live.\n\n• <b>Developer API / Documentation</b> — Complete API and integration docs for building on Astarter. Status: Mainnet live.\n\n• <b>Startup Fund (Grant Program)</b> — Ecosystem development grants for builders launching on Astarter. Expected: Q2–Q3 2026.\n\nFor developer enquiries: contact@astarter.io"
+    "a": "Astarter offers three developer resources (all going live at Mainnet Q2–Q3 2026):\n\n• <b>AI Agents Framework</b> — The open ABox agent framework. Lets developers build and deploy AI agents compatible with LangChain, AutoGPT, and major frameworks. Status: Mainnet live.\n\n• <b>Developer API / Documentation</b> — Complete API and integration docs for building on Astarter. Status: Mainnet live.\n\n• <b>Startup Fund (Grant Program)</b> — Ecosystem development grants for builders launching on Astarter. Expected: Q2–Q3 2026.\n\nFor developer enquiries: contact@astarter.io"
   },
   {
     "q": "What are the major recent updates and milestones for Astarter?",

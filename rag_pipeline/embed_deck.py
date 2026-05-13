@@ -115,12 +115,12 @@ Astarter's solution: Three pillars:
 ABox is the core AI node device of the Astarter network. It enables anyone to run AI agents and join the global AI economy.
 
 ABox Key Features:
-- Open Protocol: powered by OpenClaw, compatible with major open-source AI agent frameworks (LangChain, AutoGPT, etc.)
+- AI Agents Framework: compatible with major open-source AI agent frameworks (LangChain, AutoGPT, etc.)
 - On-chain Execution Capability: built-in engine for smart contract calls, DeFi trades, and economic actions
 - Plug-and-Play Node: connects to Astarter network out of the box, no technical setup needed
 - Multi-Agent Runtime: supports multiple AI agents running in parallel for coordinated strategies
 
-OpenClaw: The open protocol powering ABox. Makes ABox compatible with major open-source AI agent frameworks, allowing developers to build and deploy any type of AI agent on the Astarter network.
+AI Agents Framework: The open framework powering ABox. Makes ABox compatible with major open-source AI agent frameworks, allowing developers to build and deploy any type of AI agent on the Astarter network.
 
 ABox nodes sit at Layer 2 (Node Layer) of Astarter's four-layer architecture, providing compute and execution environment for the entire network."""
     },
