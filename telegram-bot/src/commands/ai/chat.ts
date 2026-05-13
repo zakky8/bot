@@ -1,7 +1,6 @@
 import { Bot } from 'grammy';
 import { BotContext } from '../../types';
 import { aiService } from '../../core/ai';
-import { isAdminOrOwner } from '../../utils/permissions';
 
 // ── Deterministic link lookup — bypasses AI for simple link requests ──────────
 // Keyed by lowercase keywords. Matched before the AI is called, so the correct
@@ -166,7 +165,9 @@ export default (bot: Bot<BotContext>) => {
     let statusMsgId: number | null = null;
 
     try {
-      if (ctx.chat?.type !== 'private' && ctx.session.aiEnabled === false) return;
+      if (ctx.chat?.type !== 'private' && ctx.session.aiEnabled === false) {
+        return; // AI explicitly disabled for this group by an admin
+      }
 
       const username = ctx.from?.username ? `@${ctx.from.username}` : (ctx.from?.first_name || 'User');
       const isGroup = ctx.chat?.type !== 'private';
@@ -222,6 +223,13 @@ export default (bot: Bot<BotContext>) => {
       if (isGroup) text = text.replace(/^@[\w]+\s*\n/, '');
       if (mentionPrefix) text = `${mentionPrefix}\n${text}`;
 
+      const feedbackMarkup = {
+        inline_keyboard: [[
+          { text: '👍 Yes', callback_data: `fb_up:${userId}:${chatId ?? ''}` },
+          { text: '👎 No',  callback_data: `fb_dn:${userId}:${chatId ?? ''}` },
+        ]],
+      };
+
       if (text.length > 4000) {
         // Too long for one message — delete status and send as chunks
         await ctx.api.deleteMessage(ctx.chat!.id, statusMsgId).catch(() => {});
@@ -233,23 +241,24 @@ export default (bot: Bot<BotContext>) => {
           else current = next;
         }
         if (current.trim()) chunks.push(current.trim());
-        for (const chunk of chunks) {
-          if (chunk) await ctx.reply(chunk, replyOpts);
+        for (let i = 0; i < chunks.length; i++) {
+          if (!chunks[i]) continue;
+          // Attach feedback buttons to the last chunk
+          const isLast = i === chunks.length - 1;
+          await ctx.reply(chunks[i], { ...replyOpts, ...(isLast ? { reply_markup: feedbackMarkup } : {}) });
         }
       } else {
-        await ctx.api.editMessageText(ctx.chat!.id, statusMsgId, text, { parse_mode: 'HTML' })
-          .catch(() => ctx.reply(text, replyOpts).catch(() => {}));
-      }
+        // Edit status message → answer + feedback buttons in one message
+        const edited = await ctx.api.editMessageText(ctx.chat!.id, statusMsgId, text, {
+          parse_mode: 'HTML',
+          reply_markup: feedbackMarkup,
+        }).catch(() => null);
 
-      // ── Feedback buttons ─────────────────────────────────────────────────
-      await ctx.reply('Was this helpful?', {
-        reply_markup: {
-          inline_keyboard: [[
-            { text: '👍 Yes', callback_data: `fb_up:${userId}:${chatId ?? ''}` },
-            { text: '👎 No',  callback_data: `fb_dn:${userId}:${chatId ?? ''}` },
-          ]],
-        },
-      }).catch(() => {});
+        if (!edited) {
+          // HTML parse failed — send as plain text fallback with feedback
+          await ctx.reply(text, { reply_markup: feedbackMarkup }).catch(() => {});
+        }
+      }
 
     } catch (error: any) {
       if (statusMsgId && ctx.chat?.id) {
@@ -270,8 +279,6 @@ export default (bot: Bot<BotContext>) => {
   
   // /ask and /ai are identical — both trigger the AI chat handler
   const askHandler = async (ctx: BotContext) => {
-    // DMs: auth middleware already guards this — but double-check for safety
-    if (ctx.chat?.type === 'private' && !(await isAdminOrOwner(ctx))) return;
 
     const typedText = (ctx.match as string)?.trim();
 
