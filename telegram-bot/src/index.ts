@@ -222,11 +222,10 @@ async function init() {
       { command: 'ask', description: '🤖 Ask the AI assistant a question' },
     ], { scope: { type: 'all_group_chats' } });
 
-    // Private chats (DMs): full command list
+    // Private chats (DMs): admin-only commands (no /ask — DMs are restricted to admins/owners)
     await bot.api.setMyCommands([
       { command: 'start', description: 'Start the bot' },
       { command: 'help', description: 'Show help menu with all features' },
-      { command: 'ask', description: 'Ask the AI assistant a question' },
       { command: 'support', description: 'Escalate to a human moderator' },
       { command: 'rules', description: 'View group rules' },
       { command: 'notes', description: 'List saved notes' },
