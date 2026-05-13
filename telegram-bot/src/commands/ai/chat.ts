@@ -340,11 +340,13 @@ export default (bot: Bot<BotContext>) => {
       const [action, userId, chatId] = ctx.callbackQuery.data.split(':');
       const helpful = action === 'fb_up';
       await aiService.storeFeedback(userId, chatId || undefined, helpful).catch(() => {});
-      await ctx.editMessageText(helpful
-        ? '👍 Thanks — glad that helped!'
-        : '👎 Thanks for the feedback — we\'ll keep improving!',
-      ).catch(() => {});
-      await ctx.answerCallbackQuery();
+      // Remove the buttons but keep the answer text untouched
+      await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => {});
+      // Show a brief toast popup — does NOT replace the message
+      await ctx.answerCallbackQuery({
+        text: helpful ? '👍 Thanks — glad that helped!' : '👎 Thanks for the feedback!',
+        show_alert: false,
+      });
     } catch {
       await ctx.answerCallbackQuery().catch(() => {});
     }
