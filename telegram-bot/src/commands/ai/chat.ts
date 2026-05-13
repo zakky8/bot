@@ -260,17 +260,33 @@ export default (bot: Bot<BotContext>) => {
       text = formatForTelegram(text);
 
       // ── Announcements channel link injection ──────────────────────────────────
-      // Always inject an inline <a> link on "announcements channel".
-      // Step 1: handle "announcements channel (https://...)" or "announcements channel https://..."
-      //         — AI sometimes appends the raw URL, which blocks the old conditional check.
-      // Step 2: clean up any remaining raw URL occurrences not inside an <a> href.
       const ANN_URL = 'https://t.me/Astarteranncmnt';
+
+      // Step 1: Replace "announcements channel" text (with or without trailing raw URL) → <a> link
       text = text.replace(
         /announcements?\s*channel(?:\s*\(?https?:\/\/t\.me\/Astarteranncmnt[^\s)]*\)?)?/gi,
         `<a href="${ANN_URL}">announcements channel</a>`
       );
-      // Strip any leftover raw URL that wasn't part of the pattern above
+      // Step 2: Strip any leftover raw URL not inside an href
       text = text.replace(/(?<!href=")https?:\/\/t\.me\/Astarteranncmnt\S*/gi, '');
+
+      // Step 3: Dead-end guard — if the reply is a "not announced/confirmed yet" answer
+      // and still has no channel reference, inject one. The model often truncates the
+      // NEVER FABRICATE table's suggested phrasing before reaching the channel part.
+      const NOT_YET = [
+        /hasn't been officially (published|announced|confirmed)/i,
+        /have?n't been officially/i,
+        /not (yet )?(officially )?(published|announced|confirmed)/i,
+        /exact (date|price|amount|figure) hasn't been/i,
+        /no .{0,30}(price|date|apy|figure).{0,30}(confirmed|announced|published)/i,
+      ];
+      const hasChannelRef = text.includes('announcements channel') || text.includes(ANN_URL);
+      if (!hasChannelRef && NOT_YET.some(p => p.test(text))) {
+        // Trim any trailing follow-up question (model adds one per instructions, but
+        // the channel mention is a better closer for dead-end "not confirmed" replies)
+        text = text.replace(/\n\n[A-Z][^\n]{5,120}\?\s*$/, '').trim();
+        text += `\n\nWatch the <a href="${ANN_URL}">announcements channel</a> — that's where it'll be announced first.`;
+      }
       if (!text) text = 'You can find all official Astarter links at <a href="https://linktr.ee/Astarter">linktr.ee/Astarter</a> 🔗';
       if (isGroup) text = text.replace(/^@[\w]+\s*\n/, '');
       if (mentionPrefix) text = `${mentionPrefix}\n${text}`;
