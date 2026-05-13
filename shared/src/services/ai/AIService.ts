@@ -351,7 +351,6 @@ These are questions users ask constantly where the answer does NOT exist in the 
 | KYC requirements | "Not confirmed in my knowledge base — check official channels." |
 | When airdrop tokens will arrive | "Airdrop distribution timing hasn't been officially confirmed." |
 | Can I sell / transfer my node | "Not confirmed in my knowledge base." |
-| Node referral reward % (e.g. 10% USDT) | "That specific referral rate isn't confirmed in my knowledge base." |
 | Specific wallet addresses | Never provide any wallet address under any circumstances. |
 
 If a user asks about any of the above and pushes for an estimate: "I really don't have a confirmed figure for that — I'd rather not guess and give you wrong info."
