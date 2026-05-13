@@ -96,15 +96,27 @@ function detectScript(text: string): string | null {
   return null;
 }
 
-// ── Per-user cooldown — blocks duplicate requests while one is in-flight ──────
-// Map<userId, startTimestamp> — auto-expires after 60s so a failed request never permanently blocks
-const aiInFlight = new Map<string, number>();
-
-function isInFlight(userId: string): boolean {
-  const started = aiInFlight.get(userId);
-  if (!started) return false;
-  if (Date.now() - started > 60_000) { aiInFlight.delete(userId); return false; } // auto-expire
-  return true;
+// ── Telegram HTML formatter — converts AI output to Telegram-safe HTML ────────
+function formatForTelegram(raw: string): string {
+  let text = raw;
+  text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2">$1</a>');
+  text = text.replace(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi, '<b>$1</b>\n');
+  text = text.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, '• $1\n');
+  text = text.replace(/<li[^>]*>/gi, '• ');
+  text = text.replace(/<\/?[uo]l[^>]*>/gi, '\n');
+  text = text.replace(/<p[^>]*>/gi, '');
+  text = text.replace(/<\/p>/gi, '\n\n');
+  text = text.replace(/<br\s*\/?>/gi, '\n');
+  text = text.replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, '<b>$1</b>');
+  text = text.replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, '<i>$1</i>');
+  text = text.replace(/<(https?:\/\/[^>]+)>/g, '$1');
+  const ALLOWED = ['b', 'i', 'u', 's', 'a', 'code', 'pre', 'tg-spoiler'];
+  const stripPattern = new RegExp(`<(?!\\/?(?:${ALLOWED.join('|')})(?:\\s[^>]*)?>)[^>]+>`, 'gi');
+  text = text.replace(stripPattern, '');
+  text = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+  text = text.replace(/(?<![_\w])_(.*?)_(?![_\w])/g, '<i>$1</i>');
+  text = text.replace(/\n{3,}/g, '\n\n').trim();
+  return text;
 }
 
 // ── Layer 4: Output guard — identity confessions + wrong links ────────────────
@@ -151,163 +163,100 @@ export default (bot: Bot<BotContext>) => {
   const handleAiChat = async (ctx: BotContext, message: string, mentionPrefix = '') => {
     const userId = ctx.from?.id?.toString() || 'unknown';
     const chatId = ctx.chat?.id?.toString();
+    let placeholderMsgId: number | null = null;
+
     try {
-      // Check if AI is enabled for this chat
-      if (ctx.chat?.type !== 'private' && ctx.session.aiEnabled === false) {
-        return; // Silent ignore if disabled in groups
-      }
+      if (ctx.chat?.type !== 'private' && ctx.session.aiEnabled === false) return;
 
       const username = ctx.from?.username ? `@${ctx.from.username}` : (ctx.from?.first_name || 'User');
       const isGroup = ctx.chat?.type !== 'private';
       const replyToId = ctx.message?.message_id;
-
-      await ctx.replyWithChatAction('typing');
-
-      // ── Deterministic link lookup — instant path, no cooldown needed ──────
-      const linkMatch = detectLinkRequest(message);
-      if (linkMatch) {
-        const replyOpts = {
-          parse_mode: 'HTML' as const,
-          ...(isGroup && replyToId ? { reply_parameters: { message_id: replyToId } } : {}),
-        };
-        await ctx.reply(`Here's the Astarter <b>${linkMatch.label}</b>:\n${linkMatch.url}`, replyOpts);
-        return;
-      }
-
-      // ── Cooldown: block duplicate AI requests while one is in-flight ──────
-      if (isInFlight(userId)) {
-        await ctx.reply('⏳ Still thinking about your last question — give me a moment!');
-        return;
-      }
-      aiInFlight.set(userId, Date.now());
-
-      // ── Language memory: detect script and store preference ───────────────
-      const detectedLang = detectScript(message);
-      if (detectedLang) {
-        aiService.setUserLang(userId, detectedLang).catch(() => {});
-      }
-      const storedLang = detectedLang ?? await aiService.getUserLang(userId).catch(() => null);
-
-      const context = await aiService.getConversationContext(userId, chatId, 'telegram');
-
-      const langTag = storedLang ? ` | Language: ${storedLang}` : '';
-      const userMsgWithMention = `[Context: User is ${username}${langTag}]\n${message}`;
-      const response = await aiService.chat(context, userMsgWithMention);
-
-      if (response.isEscalation) {
-        aiInFlight.delete(userId); // release immediately on escalation
-        await ctx.reply(
-          '🔔 <b>Connecting you to a human moderator</b>\n\n' +
-          'I could not find the answer in my knowledge base. A support agent has been notified.',
-          {
-            parse_mode: 'HTML',
-            ...(isGroup && replyToId ? { reply_parameters: { message_id: replyToId } } : {}),
-          }
-        );
-
-        const modId = getModChatId();
-        if (modId) {
-          await ctx.api.sendMessage(
-            modId,
-            `🆘 <b>AI Escalation</b>\nUser: <code>${userId}</code>\nMsg: ${message.slice(0, 400)}`,
-            { parse_mode: 'HTML' }
-          ).catch(() => {});
-        }
-        return;
-      }
-
-      // Layer 4: Output filter — catch explicit identity confessions + wrong links
-      let text = filterOutput(response.content);
-
-      // ── Convert AI-generated content to Telegram-safe HTML ───────────────────
-      // Telegram only supports: <b> <i> <u> <s> <a> <code> <pre> <tg-spoiler>
-
-      // 0. Convert Markdown links [text](url) → <a href="url">text</a>
-      //    Must run BEFORE the HTML stripper so anchors are preserved.
-      text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2">$1</a>');
-
-      // 1. Convert <h1>–<h6> headings → <b>text</b>\n
-      text = text.replace(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi, '<b>$1</b>\n');
-
-      // 2. Convert <li> items → bullet points (handle both <li>text</li> and bare <li>text)
-      text = text.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, '• $1\n');
-      text = text.replace(/<li[^>]*>/gi, '• ');
-
-      // 3. Strip list wrappers entirely (they're now just bullet lines)
-      text = text.replace(/<\/?[uo]l[^>]*>/gi, '\n');
-
-      // 4. Convert <p> and <br> → newlines
-      text = text.replace(/<p[^>]*>/gi, '');
-      text = text.replace(/<\/p>/gi, '\n\n');
-      text = text.replace(/<br\s*\/?>/gi, '\n');
-
-      // 5. Convert <strong> / <em> → Telegram equivalents
-      text = text.replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, '<b>$1</b>');
-      text = text.replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, '<i>$1</i>');
-
-      // 6a. Rescue angle-bracket URLs like <https://...> before the tag stripper deletes them.
-      //     Some AI models output <URL> as a plain-link shorthand — we convert to plain text URL.
-      text = text.replace(/<(https?:\/\/[^>]+)>/g, '$1');
-
-      // 6. Strip any remaining unsupported tags (keep allowed ones)
-      const ALLOWED = ['b', 'i', 'u', 's', 'a', 'code', 'pre', 'tg-spoiler'];
-      const stripPattern = new RegExp(
-        `<(?!\\/?(?:${ALLOWED.join('|')})(?:\\s[^>]*)?>)[^>]+>`, 'gi'
-      );
-      text = text.replace(stripPattern, '');
-
-      // 7. Convert Markdown bold **text** → <b>text</b>
-      text = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
-
-      // 8. Convert Markdown italic _text_ → <i>text</i>
-      text = text.replace(/(?<![_\w])_(.*?)_(?![_\w])/g, '<i>$1</i>');
-
-      // 9. Clean up excess blank lines (max 2 consecutive newlines)
-      text = text.replace(/\n{3,}/g, '\n\n').trim();
-      // ─────────────────────────────────────────────────────────────────────────
-
-      // Final guard: if transformations somehow produced an empty string, fall back
-      if (!text) {
-        text = 'You can find all official Astarter links at <a href="https://linktr.ee/Astarter">linktr.ee/Astarter</a> 🔗';
-      }
-
-      // Strip any @handle the AI put at the very top to avoid double-mention.
-      if (isGroup) {
-        text = text.replace(/^@[\w]+\s*\n/, '');
-      }
-
-      // Prepend mention of the original message author so they get notified
-      if (mentionPrefix) {
-        text = `${mentionPrefix}\n${text}`;
-      }
-
-      // Reply-to: quote the member's message in every group response
       const replyOpts = {
         parse_mode: 'HTML' as const,
         ...(isGroup && replyToId ? { reply_parameters: { message_id: replyToId } } : {}),
       };
 
+      // ── Deterministic link lookup — instant, no streaming needed ────────────
+      const linkMatch = detectLinkRequest(message);
+      if (linkMatch) {
+        await ctx.reply(`Here's the Astarter <b>${linkMatch.label}</b>:\n${linkMatch.url}`, replyOpts);
+        return;
+      }
+
+      // ── Language memory ────────────────────────────────────────────────────
+      const detectedLang = detectScript(message);
+      if (detectedLang) aiService.setUserLang(userId, detectedLang).catch(() => {});
+      const storedLang = detectedLang ?? await aiService.getUserLang(userId).catch(() => null);
+
+      // ── Send placeholder and start streaming ─────────────────────────────
+      const placeholder = await ctx.reply('▌', { ...(isGroup && replyToId ? { reply_parameters: { message_id: replyToId } } : {}) });
+      placeholderMsgId = placeholder.message_id;
+
+      let buffer = '';
+      let lastEdit = 0;
+      const EDIT_INTERVAL = 1200; // ms between intermediate edits
+
+      const context = await aiService.getConversationContext(userId, chatId, 'telegram');
+      const langTag = storedLang ? ` | Language: ${storedLang}` : '';
+      const userMsgWithMention = `[Context: User is ${username}${langTag}]\n${message}`;
+
+      const response = await aiService.chatStream(context, userMsgWithMention, async (chunk) => {
+        buffer += chunk;
+        const now = Date.now();
+        if (now - lastEdit >= EDIT_INTERVAL && buffer.length > 15) {
+          lastEdit = now;
+          // Intermediate: plain text + cursor (no HTML — partial markdown would break)
+          await ctx.api.editMessageText(ctx.chat!.id, placeholderMsgId!, buffer.slice(0, 3900) + ' ▌').catch(() => {});
+        }
+      });
+
+      // ── Escalation ────────────────────────────────────────────────────────
+      if (response.isEscalation) {
+        await ctx.api.deleteMessage(ctx.chat!.id, placeholderMsgId!).catch(() => {});
+        placeholderMsgId = null;
+        await ctx.reply(
+          '🔔 <b>Connecting you to a human moderator</b>\n\nI could not find the answer in my knowledge base. A support agent has been notified.',
+          { parse_mode: 'HTML', ...(isGroup && replyToId ? { reply_parameters: { message_id: replyToId } } : {}) }
+        );
+        const modId = getModChatId();
+        if (modId) {
+          await ctx.api.sendMessage(modId, `🆘 <b>AI Escalation</b>\nUser: <code>${userId}</code>\nMsg: ${message.slice(0, 400)}`, { parse_mode: 'HTML' }).catch(() => {});
+        }
+        return;
+      }
+
+      // ── Format final text ────────────────────────────────────────────────
+      let text = filterOutput(response.content);
+      text = formatForTelegram(text);
+      if (!text) text = 'You can find all official Astarter links at <a href="https://linktr.ee/Astarter">linktr.ee/Astarter</a> 🔗';
+      if (isGroup) text = text.replace(/^@[\w]+\s*\n/, '');
+      if (mentionPrefix) text = `${mentionPrefix}\n${text}`;
+
+      // ── Edit placeholder with final HTML-formatted text ──────────────────
       if (text.length > 4000) {
+        // Too long to edit — delete placeholder, send as chunks
+        await ctx.api.deleteMessage(ctx.chat!.id, placeholderMsgId!).catch(() => {});
+        placeholderMsgId = null;
         const chunks: string[] = [];
         let current = '';
         for (const line of text.split('\n')) {
           const next = current ? current + '\n' + line : line;
-          if (next.length > 3900) {
-            if (current) chunks.push(current.trim());
-            current = line;
-          } else {
-            current = next;
-          }
+          if (next.length > 3900) { if (current) chunks.push(current.trim()); current = line; }
+          else current = next;
         }
         if (current.trim()) chunks.push(current.trim());
         for (const chunk of chunks) {
           if (chunk) await ctx.reply(chunk, replyOpts);
         }
       } else {
-        await ctx.reply(text, replyOpts);
+        await ctx.api.editMessageText(ctx.chat!.id, placeholderMsgId!, text, { parse_mode: 'HTML' }).catch(async () => {
+          // Fallback: if edit fails, send as new message
+          await ctx.reply(text, replyOpts).catch(() => {});
+        });
+        placeholderMsgId = null;
       }
 
-      // ── Feedback buttons ──────────────────────────────────────────────────
+      // ── Feedback buttons ─────────────────────────────────────────────────
       await ctx.reply('Was this helpful?', {
         reply_markup: {
           inline_keyboard: [[
@@ -315,33 +264,21 @@ export default (bot: Bot<BotContext>) => {
             { text: '👎 No',  callback_data: `fb_dn:${userId}:${chatId ?? ''}` },
           ]],
         },
-      }).catch(() => {}); // non-critical — swallow if it fails
-
-      // Release cooldown 5s after successful response
-      setTimeout(() => aiInFlight.delete(userId), 5000);
+      }).catch(() => {});
 
     } catch (error: any) {
-      aiInFlight.delete(userId); // always release on error
+      // Clean up placeholder if it's still showing
+      if (placeholderMsgId && ctx.chat?.id) {
+        await ctx.api.deleteMessage(ctx.chat.id, placeholderMsgId).catch(() => {});
+      }
       console.error('AI Error:', error);
-
-      // Send real error details to mod chat so issues can be diagnosed
       const modId = getModChatId();
       if (modId) {
         const errMsg = error?.message ?? String(error);
-        ctx.api.sendMessage(
-          modId,
-          `⚠️ <b>AI Error</b>\nUser: <code>${ctx.from?.id}</code> (${ctx.from?.username ?? ctx.from?.first_name})\nMsg: ${message?.slice(0, 200)}\nError: <code>${errMsg.slice(0, 400)}</code>`,
-          { parse_mode: 'HTML' }
-        ).catch(() => {});
+        ctx.api.sendMessage(modId, `⚠️ <b>AI Error</b>\nUser: <code>${ctx.from?.id}</code> (${ctx.from?.username ?? ctx.from?.first_name})\nMsg: ${message?.slice(0, 200)}\nError: <code>${errMsg.slice(0, 400)}</code>`, { parse_mode: 'HTML' }).catch(() => {});
       }
-
-      const isThrottle = (error?.message ?? '').toLowerCase().includes('throttl') ||
-                         (error?.name ?? '').includes('Throttling') ||
-                         (error?.message ?? '').toLowerCase().includes('too many requests');
-      const userMsg = isThrottle
-        ? '⏳ I\'m handling a lot of questions right now — please try again in a few seconds!'
-        : '🤖 Something went wrong on my end. Please try again shortly.';
-      await ctx.reply(userMsg);
+      const isThrottle = (error?.message ?? '').toLowerCase().includes('throttl') || (error?.name ?? '').includes('Throttling') || (error?.message ?? '').toLowerCase().includes('too many requests');
+      await ctx.reply(isThrottle ? '⏳ I\'m handling a lot of questions right now — please try again in a few seconds!' : '🤖 Something went wrong on my end. Please try again shortly.');
     }
   };
 

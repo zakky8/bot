@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
+import { BedrockRuntimeClient, ConverseCommand, ConverseStreamCommand } from '@aws-sdk/client-bedrock-runtime';
 import { Ollama } from 'ollama';
 import { Redis } from 'ioredis';
 import { Logger } from 'winston';
@@ -1011,6 +1011,167 @@ ${faqBlock
     }
 
     return result;
+  }
+
+  // ── Streaming generation ─────────────────────────────────────────────────────
+
+  private async streamWithAnthropic(
+    messages: AIMessage[],
+    systemPrompt: string,
+    onChunk: (chunk: string) => Promise<void>,
+    model?: string,
+  ): Promise<{ text: string; tokensUsed: number }> {
+    if (!this.anthropic) throw new Error('Anthropic not initialised');
+    const modelToUse = model ?? this.config.defaultModel;
+    const chatMessages = messages
+      .filter(m => m.role !== 'system')
+      .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+
+    const stream = this.anthropic.messages.stream({
+      model: modelToUse,
+      max_tokens: Math.min(this.config.maxTokens, 800),
+      temperature: 0.2,
+      system: systemPrompt,
+      messages: chatMessages,
+    });
+
+    let text = '';
+    for await (const chunk of stream.textStream) {
+      text += chunk;
+      await onChunk(chunk);
+    }
+    const final = await stream.finalMessage();
+    return { text, tokensUsed: final.usage.input_tokens + final.usage.output_tokens };
+  }
+
+  private async streamWithAWS(
+    messages: AIMessage[],
+    systemPrompt: string,
+    onChunk: (chunk: string) => Promise<void>,
+    model?: string,
+  ): Promise<{ text: string }> {
+    if (!this.bedrock) throw new Error('AWS Bedrock not initialised');
+    let modelToUse = model ?? this.config.defaultModel ?? 'openai.gpt-oss-20b-1:0';
+
+    if (modelToUse.startsWith('anthropic.')) {
+      const region = this.config.awsRegion ?? 'us-east-1';
+      const bare = modelToUse.replace(/^(eu|us|ap)\./, '');
+      modelToUse = region.startsWith('eu-') ? `eu.${bare}` : region.startsWith('ap-') ? `ap.${bare}` : `us.${bare}`;
+    }
+
+    const sanitized = this.sanitizeMessagesForBedrock(messages);
+    if (sanitized.length === 0) throw new Error('No valid messages after sanitisation');
+
+    const command = new ConverseStreamCommand({
+      modelId: modelToUse,
+      system: [{ text: systemPrompt }],
+      messages: sanitized.map(m => ({ role: m.role, content: [{ text: m.content }] })),
+      inferenceConfig: { maxTokens: this.config.maxTokens || 800, temperature: 0.1, topP: 0.5 },
+    });
+
+    const response = await this.bedrock.send(command);
+    let text = '';
+    for await (const event of response.stream!) {
+      const chunk = event.contentBlockDelta?.delta?.text;
+      if (chunk) { text += chunk; await onChunk(chunk); }
+    }
+    if (!text) throw new Error('AWS Bedrock stream returned no text');
+    return { text };
+  }
+
+  /** Stream AI response, calling onChunk for every token. Returns the final AIResponse. */
+  async chatStream(
+    context: ConversationContext,
+    userMessage: string,
+    onChunk: (chunk: string) => Promise<void>,
+    options?: { model?: string; systemPrompt?: string; saveContext?: boolean },
+  ): Promise<AIResponse> {
+    const allowed = await this.checkRateLimit(context.userId);
+    if (!allowed) throw new Error('Rate limit exceeded. Please try again later.');
+
+    const safeMessage = this.sanitizeInput(userMessage);
+    const messages: AIMessage[] = [
+      ...this.compressHistory(context.messages),
+      { role: 'user', content: safeMessage },
+    ];
+
+    // RAG — same as chat()
+    const cleanCurrent = safeMessage.replace(/^\[Context:[^\]]*\]\n?/i, '').trim();
+    const RAG_PREAMBLE = /^(do you know|can you tell me|can you explain|what (is|are|was|were)|who (is|are|was)|where (is|are)|when (is|are|was)|how (do|does|did|can|should|is)|tell me about|i (want|need) to know|i have a question about|please (explain|tell me|describe)|any (info|information|details|update|news) (on|about|regarding)|is (there|it)|are there|have you heard|do you have)\s+/i;
+    const topicQuery = cleanCurrent.replace(RAG_PREAMBLE, '').trim() || cleanCurrent;
+    const lastUser = context.messages.filter(m => m.role === 'user').slice(-1)[0]?.content?.replace(/^\[Context:[^\]]*\]\n?/i, '').trim() ?? '';
+    const isFollowUp = topicQuery.length < 60 && lastUser.length > 0;
+    const ragQuery = isFollowUp ? `${lastUser} ${topicQuery}`.slice(0, 400) : topicQuery;
+
+    let ragContext = '';
+    if (this.vectorStore && ragQuery.length > 0) {
+      const MIN_SCORE = 0.35;
+      const deckRaw = await this.vectorStore.searchFiltered(ragQuery, 5, ['astarter_deck', 'manual']);
+      let deckHits = deckRaw.filter(h => h.score >= MIN_SCORE);
+      if (deckHits.length === 0 && ragQuery.length > 20) {
+        const short = ragQuery.split(/\s+/).slice(0, 5).join(' ');
+        const retry = await this.vectorStore.searchFiltered(short, 5, ['astarter_deck', 'manual']);
+        deckHits = retry.filter(h => h.score >= MIN_SCORE - 0.05);
+      }
+      const histRaw = deckHits.length < 2 ? await this.vectorStore.searchFiltered(ragQuery, 2, ['telegram_history']) : [];
+      const histHits = histRaw.filter(h => h.score >= MIN_SCORE);
+      const parts: string[] = [];
+      if (deckHits.length > 0) parts.push('## Current Project Knowledge (authoritative — use this)\n' + deckHits.map(h => h.pageContent).join('\n---\n'));
+      if (histHits.length > 0) parts.push('## Community Chat (supplementary — DISCARD Cardano/launchpad content)\n' + histHits.map(h => h.pageContent).join('\n---\n'));
+      if (parts.length > 0) ragContext = parts.join('\n\n');
+    }
+
+    const basePrompt = this.buildSystemPrompt(options?.systemPrompt ?? context.systemPrompt);
+    const dynamicPrompt = ragContext
+      ? `${basePrompt}\n\n---\n# Retrieved Context\nThe following was retrieved from the verified knowledge base. Use it to answer directly and confidently. Paraphrase naturally; do not copy-paste.\n\n${ragContext}`
+      : basePrompt;
+
+    // Stream from provider
+    let fullText = '';
+    let tokensUsed = 0;
+    let provider: 'anthropic' | 'aws' | 'ollama' = 'aws';
+    let usedModel = options?.model ?? this.config.defaultModel;
+
+    try {
+      if (this.anthropic) {
+        const r = await this.streamWithAnthropic(messages, dynamicPrompt, onChunk, options?.model);
+        fullText = r.text; tokensUsed = r.tokensUsed; provider = 'anthropic';
+      } else if (this.bedrock) {
+        const r = await this.streamWithAWS(messages, dynamicPrompt, onChunk, options?.model);
+        fullText = r.text; provider = 'aws';
+      } else if (this.ollama) {
+        const r = await this.generateWithOllama([{ role: 'system', content: dynamicPrompt }, ...messages], options?.model);
+        fullText = r.content; provider = 'ollama'; usedModel = r.model;
+        await onChunk(r.content);
+      } else {
+        throw new Error('No AI provider available.');
+      }
+    } catch (err: any) {
+      // Fallback to Bedrock if Anthropic fails
+      if (provider === 'anthropic' && this.bedrock) {
+        this.logger.warn('Anthropic stream failed — falling back to Bedrock');
+        const r = await this.streamWithAWS(messages, dynamicPrompt, onChunk, options?.model);
+        fullText = r.text; provider = 'aws';
+      } else { throw err; }
+    }
+
+    const response: AIResponse = { content: fullText, model: usedModel, provider, tokensUsed };
+
+    // Post-processing (same as chat())
+    response.content = this.sanitizeOutput(response.content);
+    if (!response.content.trim()) {
+      response.content = "I don't have that link confirmed right now — you can find all official Astarter links at https://linktr.ee/Astarter 🔗";
+    }
+    const escalateCandidate = response.content.trim().replace(/^\*{1,2}(.*?)\*{1,2}$/, '$1').trim();
+    if (/^ESCALATE[.!]?\s*$/i.test(escalateCandidate)) {
+      response.isEscalation = true;
+      response.content = "I want to make sure you get the right help — let me flag this for a team member who can assist you further! 🙌";
+    }
+    if (options?.saveContext !== false) {
+      await this.saveConversationContext({ ...context, messages: [...messages, { role: 'assistant', content: response.content }] });
+    }
+    await this.logUsage(context, response);
+    return response;
   }
 
   // ── Language memory ───────────────────────────────────────────────────────────
