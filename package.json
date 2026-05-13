@@ -4,14 +4,12 @@
     "description": "Production-ready Telegram bot system with Anthropic Claude AI",
     "main": "index.js",
     "scripts": {
-        "install:all": "npm run install:shared && npm run install:telegram && npm run install:discord",
+        "install": "npm run install:shared && npm run install:telegram",
         "install:shared": "cd shared && npm install",
         "install:telegram": "cd telegram-bot && npm install",
-        "install:discord": "cd fundingpips-bot && npm install",
         "build": "npm run build:shared && npm run build:telegram",
         "build:shared": "cd shared && npm run build",
         "build:telegram": "cd telegram-bot && npm run build",
-        "build:discord": "cd fundingpips-bot && npm run build",
         "test": "npm run test:shared && npm run test:telegram",
         "test:shared": "cd shared && npm test",
         "test:telegram": "cd telegram-bot && npm test",
@@ -21,8 +19,8 @@
         "lint": "npm run lint:shared && npm run lint:telegram",
         "lint:shared": "cd shared && npm run lint",
         "lint:telegram": "cd telegram-bot && npm run lint",
-        "dev:telegram": "cd telegram-bot && npm run dev",
-        "start:telegram": "cd telegram-bot && npm start"
+        "dev": "cd telegram-bot && npm run dev",
+        "start": "cd telegram-bot && npm start"
     },
     "keywords": [
         "telegram",
