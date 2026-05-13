@@ -83,6 +83,22 @@ function detectLinkRequest(message: string): { url: string; label: string } | nu
   return null;
 }
 
+// ── Language detection — identifies non-Latin scripts for language memory ────
+function detectScript(text: string): string | null {
+  if (/[Ѐ-ӿ]/.test(text)) return 'Russian';
+  if (/[؀-ۿ]/.test(text)) return 'Arabic';
+  if (/[一-鿿]/.test(text)) return 'Chinese';
+  if (/[가-힯]/.test(text)) return 'Korean';
+  if (/[぀-ゟ゠-ヿ]/.test(text)) return 'Japanese';
+  if (/[ऀ-ॿ]/.test(text)) return 'Hindi';
+  if (/[฀-๿]/.test(text)) return 'Thai';
+  if (/[Ͱ-Ͽ]/.test(text)) return 'Greek';
+  return null;
+}
+
+// ── Per-user cooldown — blocks duplicate requests while one is in-flight ──────
+const aiInFlight = new Set<string>();
+
 // ── Layer 4: Output guard — identity confessions + wrong links ────────────────
 
 const EXPLICIT_CONFESSION_PATTERNS = [
@@ -135,32 +151,43 @@ export default (bot: Bot<BotContext>) => {
       const chatId = ctx.chat?.id?.toString();
       const username = ctx.from?.username ? `@${ctx.from.username}` : (ctx.from?.first_name || 'User');
       const isGroup = ctx.chat?.type !== 'private';
-      const replyToId = ctx.message?.message_id; // for reply-to-message in groups
+      const replyToId = ctx.message?.message_id;
 
       await ctx.replyWithChatAction('typing');
 
-      // ── Deterministic link lookup — resolve before hitting the AI ────────────
-      // Eliminates hallucinated/wrong URLs for simple "give me the X link" queries.
+      // ── Deterministic link lookup — instant path, no cooldown needed ──────
       const linkMatch = detectLinkRequest(message);
       if (linkMatch) {
         const replyOpts = {
           parse_mode: 'HTML' as const,
           ...(isGroup && replyToId ? { reply_parameters: { message_id: replyToId } } : {}),
         };
-        await ctx.reply(
-          `Here's the Astarter <b>${linkMatch.label}</b>:\n${linkMatch.url}`,
-          replyOpts,
-        );
+        await ctx.reply(`Here's the Astarter <b>${linkMatch.label}</b>:\n${linkMatch.url}`, replyOpts);
         return;
       }
-      // ─────────────────────────────────────────────────────────────────────────
+
+      // ── Cooldown: block duplicate AI requests while one is in-flight ──────
+      if (aiInFlight.has(userId)) {
+        await ctx.reply('⏳ Still thinking about your last question — give me a moment!');
+        return;
+      }
+      aiInFlight.add(userId);
+
+      // ── Language memory: detect script and store preference ───────────────
+      const detectedLang = detectScript(message);
+      if (detectedLang) {
+        aiService.setUserLang(userId, detectedLang).catch(() => {});
+      }
+      const storedLang = detectedLang ?? await aiService.getUserLang(userId).catch(() => null);
 
       const context = await aiService.getConversationContext(userId, chatId, 'telegram');
 
-      const userMsgWithMention = `[Context: User is ${username}]\n${message}`;
+      const langTag = storedLang ? ` | Language: ${storedLang}` : '';
+      const userMsgWithMention = `[Context: User is ${username}${langTag}]\n${message}`;
       const response = await aiService.chat(context, userMsgWithMention);
 
       if (response.isEscalation) {
+        aiInFlight.delete(userId);
         await ctx.reply(
           '🔔 <b>Connecting you to a human moderator</b>\n\n' +
           'I could not find the answer in my knowledge base. A support agent has been notified.',
@@ -253,7 +280,6 @@ export default (bot: Bot<BotContext>) => {
       };
 
       if (text.length > 4000) {
-        // Split at newlines to avoid cutting mid HTML-tag or mid-word
         const chunks: string[] = [];
         let current = '';
         for (const line of text.split('\n')) {
@@ -272,7 +298,22 @@ export default (bot: Bot<BotContext>) => {
       } else {
         await ctx.reply(text, replyOpts);
       }
+
+      // ── Feedback buttons ──────────────────────────────────────────────────
+      await ctx.reply('Was this helpful?', {
+        reply_markup: {
+          inline_keyboard: [[
+            { text: '👍 Yes', callback_data: `fb_up:${userId}:${chatId ?? ''}` },
+            { text: '👎 No',  callback_data: `fb_dn:${userId}:${chatId ?? ''}` },
+          ]],
+        },
+      }).catch(() => {}); // non-critical — swallow if it fails
+
+      // Release cooldown 5s after response
+      setTimeout(() => aiInFlight.delete(userId), 5000);
+
     } catch (error: any) {
+      aiInFlight.delete(userId); // always release on error
       console.error('AI Error:', error);
 
       // Send real error details to mod chat so issues can be diagnosed
@@ -356,6 +397,22 @@ export default (bot: Bot<BotContext>) => {
 
   bot.command('ask', askHandler);
   bot.command('ai', askHandler);
+
+  // ── Feedback callback handler ─────────────────────────────────────────────
+  bot.callbackQuery(/^fb_(up|dn):/, async (ctx) => {
+    try {
+      const [action, userId, chatId] = ctx.callbackQuery.data.split(':');
+      const helpful = action === 'fb_up';
+      await aiService.storeFeedback(userId, chatId || undefined, helpful).catch(() => {});
+      await ctx.editMessageText(helpful
+        ? '👍 Thanks — glad that helped!'
+        : '👎 Thanks for the feedback — we\'ll keep improving!',
+      ).catch(() => {});
+      await ctx.answerCallbackQuery();
+    } catch {
+      await ctx.answerCallbackQuery().catch(() => {});
+    }
+  });
 
   bot.command('support', async (ctx) => {
     // Support command remains for everyone to reach mods

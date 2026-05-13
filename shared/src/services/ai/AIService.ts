@@ -746,9 +746,9 @@ ${faqBlock
     // 2. Sanitise input
     const safeMessage = this.sanitizeInput(userMessage);
 
-    // 3. Build message history
+    // 3. Build message history (compress if long)
     const messages: AIMessage[] = [
-      ...context.messages,
+      ...this.compressHistory(context.messages),
       { role: 'user', content: safeMessage },
     ];
 
@@ -1011,6 +1011,41 @@ ${faqBlock
     }
 
     return result;
+  }
+
+  // ── Language memory ───────────────────────────────────────────────────────────
+  async getUserLang(userId: string): Promise<string | null> {
+    try { return await this.redis.get(`ai:user_lang:${userId}`); } catch { return null; }
+  }
+
+  async setUserLang(userId: string, lang: string): Promise<void> {
+    try { await this.redis.setex(`ai:user_lang:${userId}`, 30 * 24 * 3600, lang); } catch {}
+  }
+
+  // ── Conversation history compression ─────────────────────────────────────────
+  private compressHistory(messages: AIMessage[]): AIMessage[] {
+    if (messages.length <= 10) return messages;
+    const recent = messages.slice(-6);
+    const old = messages.slice(0, -6);
+    const topics = old
+      .filter(m => m.role === 'user')
+      .map(m => m.content.replace(/^\[Context:[^\]]*\]\n?/i, '').trim().slice(0, 120))
+      .filter(Boolean)
+      .join('; ');
+    return [
+      { role: 'user', content: `[Earlier in our conversation, topics discussed: ${topics}]` },
+      { role: 'assistant', content: 'Understood, I have context from our earlier discussion.' },
+      ...recent,
+    ];
+  }
+
+  // ── Feedback storage ──────────────────────────────────────────────────────────
+  async storeFeedback(userId: string, chatId: string | undefined, helpful: boolean): Promise<void> {
+    try {
+      const date = new Date().toISOString().split('T')[0];
+      await this.redis.lpush(`ai:feedback:${date}`, JSON.stringify({ userId, chatId, helpful, timestamp: Date.now() }));
+      await this.redis.expire(`ai:feedback:${date}`, 90 * 24 * 3600);
+    } catch {}
   }
 
   async testConnection(): Promise<{ anthropic: boolean; aws: boolean; ollama: boolean }> {
