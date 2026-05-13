@@ -97,7 +97,15 @@ function detectScript(text: string): string | null {
 }
 
 // ── Per-user cooldown — blocks duplicate requests while one is in-flight ──────
-const aiInFlight = new Set<string>();
+// Map<userId, startTimestamp> — auto-expires after 60s so a failed request never permanently blocks
+const aiInFlight = new Map<string, number>();
+
+function isInFlight(userId: string): boolean {
+  const started = aiInFlight.get(userId);
+  if (!started) return false;
+  if (Date.now() - started > 60_000) { aiInFlight.delete(userId); return false; } // auto-expire
+  return true;
+}
 
 // ── Layer 4: Output guard — identity confessions + wrong links ────────────────
 
@@ -167,11 +175,11 @@ export default (bot: Bot<BotContext>) => {
       }
 
       // ── Cooldown: block duplicate AI requests while one is in-flight ──────
-      if (aiInFlight.has(userId)) {
+      if (isInFlight(userId)) {
         await ctx.reply('⏳ Still thinking about your last question — give me a moment!');
         return;
       }
-      aiInFlight.add(userId);
+      aiInFlight.set(userId, Date.now());
 
       // ── Language memory: detect script and store preference ───────────────
       const detectedLang = detectScript(message);
@@ -187,7 +195,7 @@ export default (bot: Bot<BotContext>) => {
       const response = await aiService.chat(context, userMsgWithMention);
 
       if (response.isEscalation) {
-        aiInFlight.delete(userId);
+        aiInFlight.delete(userId); // release immediately on escalation
         await ctx.reply(
           '🔔 <b>Connecting you to a human moderator</b>\n\n' +
           'I could not find the answer in my knowledge base. A support agent has been notified.',
@@ -309,7 +317,7 @@ export default (bot: Bot<BotContext>) => {
         },
       }).catch(() => {}); // non-critical — swallow if it fails
 
-      // Release cooldown 5s after response
+      // Release cooldown 5s after successful response
       setTimeout(() => aiInFlight.delete(userId), 5000);
 
     } catch (error: any) {
