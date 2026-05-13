@@ -159,7 +159,7 @@ export default (bot: Bot<BotContext>) => {
   /**
    * Common AI Chat Handler
    */
-  const handleAiChat = async (ctx: BotContext, message: string, mentionPrefix = '') => {
+  const handleAiChat = async (ctx: BotContext, message: string, mentionPrefix = '', forceLang: string | null = null) => {
     const userId = ctx.from?.id?.toString() || 'unknown';
     const chatId = ctx.chat?.id?.toString();
     let statusMsgId: number | null = null;
@@ -184,9 +184,10 @@ export default (bot: Bot<BotContext>) => {
         return;
       }
 
-      // ── Language detection — only tag the current message's language ─────
-      // Do NOT pull stored language from Redis — that would cause the bot to
-      // reply in Russian/Arabic/etc. on all future messages after one non-Latin message.
+      // ── Language detection ────────────────────────────────────────────────
+      // Detect from current message only. If nothing detected (e.g. Latin script)
+      // and a forceLang was passed (sender's stored language from a pure /ai reply),
+      // use that so the reply comes back in the sender's language, not the replied msg's.
       const detectedLang = detectScript(message);
       if (detectedLang) aiService.setUserLang(userId, detectedLang).catch(() => {});
 
@@ -199,7 +200,8 @@ export default (bot: Bot<BotContext>) => {
 
       // ── Step 2: fetch AI response ────────────────────────────────────────
       const context = await aiService.getConversationContext(userId, chatId, 'telegram');
-      const langTag = detectedLang ? ` | Language: ${detectedLang}` : '';
+      const activeLang = detectedLang ?? forceLang;
+      const langTag = activeLang ? ` | Language: ${activeLang}` : '';
       const userMsgWithMention = `[Context: User is ${username}${langTag}]\n${message}`;
 
       const response = await aiService.chat(context, userMsgWithMention);
@@ -317,7 +319,15 @@ export default (bot: Bot<BotContext>) => {
       );
     }
 
-    await handleAiChat(ctx, message, mentionPrefix);
+    // If /ai was used as a pure reply (no text typed), fetch the sender's stored
+    // language so the reply comes back in their language, not the replied message's.
+    let forceLang: string | null = null;
+    if (!typedText && ctx.message?.reply_to_message) {
+      const userId = ctx.from?.id?.toString() || 'unknown';
+      forceLang = await aiService.getUserLang(userId).catch(() => null);
+    }
+
+    await handleAiChat(ctx, message, mentionPrefix, forceLang);
   };
 
   bot.command('ask', askHandler);
