@@ -222,6 +222,17 @@ export default (bot: Bot<BotContext>) => {
       // ── Step 3: format and replace the status message with the final answer ──
       let text = filterOutput(response.content);
       text = formatForTelegram(text);
+
+      // ── Announcements channel link injection ──────────────────────────────────
+      // If the AI mentions the announcements channel but the URL was stripped or
+      // omitted, append it so the user always gets a clickable link.
+      const ANN_URL = 'https://t.me/Astarteranncmnt';
+      if (
+        /announcements?\s*channel/i.test(text) &&
+        !text.includes(ANN_URL)
+      ) {
+        text = text.trimEnd() + `\n\n📢 <a href="${ANN_URL}">Announcements Channel</a>`;
+      }
       if (!text) text = 'You can find all official Astarter links at <a href="https://linktr.ee/Astarter">linktr.ee/Astarter</a> 🔗';
       if (isGroup) text = text.replace(/^@[\w]+\s*\n/, '');
       if (mentionPrefix) text = `${mentionPrefix}\n${text}`;
