@@ -259,6 +259,9 @@ export default (bot: Bot<BotContext>) => {
       let text = filterOutput(response.content);
       text = formatForTelegram(text);
 
+      // ── Ensure "Short answer:" label is bold (model often drops the tags) ──────
+      text = text.replace(/^Short answer:\s*/i, '<b>Short answer:</b> ');
+
       // ── Announcements channel link injection ──────────────────────────────────
       const ANN_URL = 'https://t.me/Astarteranncmnt';
 
