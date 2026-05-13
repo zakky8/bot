@@ -113,7 +113,7 @@ const ALLOWED_URLS = new Set([
   'https://www.astarter.io',
   'https://astarter.gitbook.io',
   'https://t.me/AstarterDefiHubOfficial',
-  'https://t.me/Astarteranncmnt',
+  'https://https://t.me/Astarteranncmnt',
   'https://x.com/AstarterDefiHub',
   'https://twitter.com/AstarterDefiHub',
   'https://discord.gg/XXDEjFPrgR',
@@ -381,14 +381,14 @@ GOOD:
 Pick the right pattern — don't mix them:
 
 Not officially announced yet — use one of these variations (rotate, never repeat the same one back-to-back):
-→ "That hasn't been confirmed yet — the announcements channel is the best place to catch it first: t.me/Astarteranncmnt"
-→ "Nothing official on that yet — keep an eye on the announcements channel: t.me/Astarteranncmnt"
-→ "Not announced yet — drop by the announcements channel and you'll see it the moment it drops: t.me/Astarteranncmnt"
+→ "That hasn't been confirmed yet — the announcements channel is the best place to catch it first: https://t.me/Astarteranncmnt"
+→ "Nothing official on that yet — keep an eye on the announcements channel: https://t.me/Astarteranncmnt"
+→ "Not announced yet — drop by the announcements channel and you'll see it the moment it drops: https://t.me/Astarteranncmnt"
 
 Outside your knowledge entirely (events, dates, features, updates) — use one of these variations (rotate, never repeat the same one back-to-back):
-→ "I don't have that one — best spot for the latest is the announcements channel: t.me/Astarteranncmnt"
-→ "That's not something I have confirmed info on — check the announcements channel for updates: t.me/Astarteranncmnt"
-→ "Can't confirm that right now — the announcements channel will have it when it's out: t.me/Astarteranncmnt"
+→ "I don't have that one — best spot for the latest is the announcements channel: https://t.me/Astarteranncmnt"
+→ "That's not something I have confirmed info on — check the announcements channel for updates: https://t.me/Astarteranncmnt"
+→ "Can't confirm that right now — the announcements channel will have it when it's out: https://t.me/Astarteranncmnt"
 
 Partnership, listing, or business enquiries:
 → "For that, reach out directly to the team at <code>contact@astarter.io</code>."
@@ -414,7 +414,7 @@ When a user asks for a specific link, give EXACTLY the URL below for that topic.
 • gitbook / docs / documentation / guide → https://astarter.gitbook.io/astarter
 • website / homepage → https://www.astarter.io
 • telegram community / tg group / community chat → https://t.me/AstarterDefiHubOfficial
-• announcements / ann channel → https://t.me/Astarteranncmnt
+• announcements / ann channel → https://https://t.me/Astarteranncmnt
 • twitter / x → https://x.com/AstarterDefiHub
 • discord → https://discord.gg/XXDEjFPrgR
 • medium / blog → https://medium.com/@AstarterDefiHub
