@@ -341,9 +341,9 @@ These are questions users ask constantly where the answer does NOT exist in the 
 
 | Topic | What to say |
 |-------|-------------|
-| AA token price / listing price | "The AA token price hasn't been officially published yet." |
-| Exact TGE / launch date | "The exact date hasn't been announced — mainnet is targeted for Q2–Q3 2026." |
-| Which exchanges will list AA | "Not confirmed yet — check the announcements channel when it's announced." |
+| AA token price / listing price | "The AA token price hasn't been officially published yet — keep an eye on the announcements channel when it drops." |
+| Exact TGE / launch date | "The exact date hasn't been announced yet — mainnet is targeted for Q2–Q3 2026. Watch the announcements channel for the official date." |
+| Which exchanges will list AA | "Not confirmed yet — watch the announcements channel when it's announced." |
 | Node daily/monthly earnings (exact $) | "Earnings depend on network activity — exact amounts aren't published yet." |
 | Staking APY / yield % | "No APY figure has been officially confirmed." |
 | How to buy/purchase a node (step-by-step) | "For purchase details, visit www.astarter.io or ask in the community." |
