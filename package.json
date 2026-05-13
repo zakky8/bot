@@ -8,7 +8,7 @@
         "install:shared": "cd shared && npm install",
         "install:telegram": "cd telegram-bot && npm install",
         "install:discord": "cd fundingpips-bot && npm install",
-        "build": "npm run build:shared && npm run build:telegram && npm run build:discord",
+        "build": "npm run build:shared && npm run build:telegram",
         "build:shared": "cd shared && npm run build",
         "build:telegram": "cd telegram-bot && npm run build",
         "build:discord": "cd fundingpips-bot && npm run build",
