@@ -225,12 +225,15 @@ export default (bot: Bot<BotContext>) => {
 
       const feedbackMarkup = {
         inline_keyboard: [[
-          { text: '👍 Yes', callback_data: `fb_up:${userId}:${chatId ?? ''}` },
-          { text: '👎 No',  callback_data: `fb_dn:${userId}:${chatId ?? ''}` },
+          { text: '👍 Helpful', callback_data: `fb_up:${userId}:${chatId ?? ''}` },
+          { text: '👎 Not helpful', callback_data: `fb_dn:${userId}:${chatId ?? ''}` },
         ]],
       };
 
-      if (text.length > 4000) {
+      // Append feedback prompt so users know the buttons are for rating, not answering
+      const textWithFeedback = text + '\n\n<i>Was this helpful?</i>';
+
+      if (textWithFeedback.length > 4000) {
         // Too long for one message — delete status and send as chunks
         await ctx.api.deleteMessage(ctx.chat!.id, statusMsgId).catch(() => {});
         let current = '';
@@ -243,20 +246,20 @@ export default (bot: Bot<BotContext>) => {
         if (current.trim()) chunks.push(current.trim());
         for (let i = 0; i < chunks.length; i++) {
           if (!chunks[i]) continue;
-          // Attach feedback buttons to the last chunk
           const isLast = i === chunks.length - 1;
-          await ctx.reply(chunks[i], { ...replyOpts, ...(isLast ? { reply_markup: feedbackMarkup } : {}) });
+          const chunkText = isLast ? chunks[i] + '\n\n<i>Was this helpful?</i>' : chunks[i];
+          await ctx.reply(chunkText, { ...replyOpts, ...(isLast ? { reply_markup: feedbackMarkup } : {}) });
         }
       } else {
         // Edit status message → answer + feedback buttons in one message
-        const edited = await ctx.api.editMessageText(ctx.chat!.id, statusMsgId, text, {
+        const edited = await ctx.api.editMessageText(ctx.chat!.id, statusMsgId, textWithFeedback, {
           parse_mode: 'HTML',
           reply_markup: feedbackMarkup,
         }).catch(() => null);
 
         if (!edited) {
           // HTML parse failed — send as plain text fallback with feedback
-          await ctx.reply(text, { reply_markup: feedbackMarkup }).catch(() => {});
+          await ctx.reply(textWithFeedback, { reply_markup: feedbackMarkup }).catch(() => {});
         }
       }
 
