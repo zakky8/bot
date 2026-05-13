@@ -193,27 +193,25 @@ export default (bot: Bot<BotContext>) => {
       // Phase 2: send first message with actual content (no cursor placeholder)
       // Phase 3: edit that message every THROTTLE_MS with progressively more text
       // Phase 4: final edit with fully HTML-formatted answer
-      const MIN_INITIAL_CHARS = 60;  // chars before first message is sent
-      const THROTTLE_MS = 1000;      // ms between intermediate edits
+      const MIN_INITIAL_CHARS = 25; // chars before first message is sent
+      const THROTTLE_MS = 400;     // ms between intermediate edits
 
       let buffer = '';
       let streamMsgId: number | null = null;
+      let initialSending = false; // guard against concurrent initial sends
+      let streamDone = false;     // set true when stream resolves to stop in-flight sends
 
       await ctx.replyWithChatAction('typing').catch(() => {});
       const typingTicker = setInterval(() => {
         ctx.replyWithChatAction('typing').catch(() => {});
       }, 4000);
 
-      // Ticker edits the live message with growing text on a fixed clock
-      let initialSending = false; // guard against concurrent initial sends
-      let streamDone = false;     // set true when stream resolves to stop in-flight sends
-      const streamTicker = setInterval(async () => {
+      const doStreamTick = async () => {
         if (streamDone) return;
         const preview = buffer.slice(0, 4000).trimEnd();
         if (!preview) return;
 
         if (streamMsgId === null) {
-          // Don't send anything until we have enough text to feel meaningful
           if (preview.length < MIN_INITIAL_CHARS || initialSending) return;
           initialSending = true;
           try {
@@ -233,7 +231,11 @@ export default (bot: Bot<BotContext>) => {
           // Edit with more text — plain text during streaming (partial HTML would break)
           ctx.api.editMessageText(ctx.chat!.id, streamMsgId, preview).catch(() => {});
         }
-      }, THROTTLE_MS);
+      };
+
+      // Fire first check quickly (catches fast models), then keep ticking every THROTTLE_MS
+      const earlyCheck = setTimeout(doStreamTick, 150);
+      const streamTicker = setInterval(doStreamTick, THROTTLE_MS);
 
       const context = await aiService.getConversationContext(userId, chatId, 'telegram');
       const langTag = storedLang ? ` | Language: ${storedLang}` : '';
@@ -246,6 +248,7 @@ export default (bot: Bot<BotContext>) => {
         });
       } finally {
         streamDone = true; // tell any in-flight ticker callback to discard its send
+        clearTimeout(earlyCheck);
         clearInterval(streamTicker);
         clearInterval(typingTicker);
       }
