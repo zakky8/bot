@@ -163,6 +163,7 @@ export default (bot: Bot<BotContext>) => {
   const handleAiChat = async (ctx: BotContext, message: string, mentionPrefix = '') => {
     const userId = ctx.from?.id?.toString() || 'unknown';
     const chatId = ctx.chat?.id?.toString();
+    let statusMsgId: number | null = null;
 
     try {
       if (ctx.chat?.type !== 'private' && ctx.session.aiEnabled === false) return;
@@ -187,82 +188,26 @@ export default (bot: Bot<BotContext>) => {
       if (detectedLang) aiService.setUserLang(userId, detectedLang).catch(() => {});
       const storedLang = detectedLang ?? await aiService.getUserLang(userId).catch(() => null);
 
-      // ── OpenClaw-style streaming: type indicator → first real words → grow → final ──
-      //
-      // Phase 1: show "typing..." while buffering until MIN_INITIAL_CHARS are ready
-      // Phase 2: send first message with actual content (no cursor placeholder)
-      // Phase 3: edit that message every THROTTLE_MS with progressively more text
-      // Phase 4: final edit with fully HTML-formatted answer
-      const MIN_INITIAL_CHARS = 25; // chars before first message is sent
-      const THROTTLE_MS = 400;     // ms between intermediate edits
+      // ── Step 1: instant acknowledgment so user knows the bot received the message ──
+      const statusMsg = await ctx.reply('🔍 <i>Looking into that...</i>', {
+        parse_mode: 'HTML',
+        ...(isGroup && replyToId ? { reply_parameters: { message_id: replyToId } } : {}),
+      });
+      statusMsgId = statusMsg.message_id;
 
-      let buffer = '';
-      let streamMsgId: number | null = null;
-      let initialSending = false; // guard against concurrent initial sends
-      let streamDone = false;     // set true when stream resolves to stop in-flight sends
-
-      await ctx.replyWithChatAction('typing').catch(() => {});
-      const typingTicker = setInterval(() => {
-        ctx.replyWithChatAction('typing').catch(() => {});
-      }, 4000);
-
-      const doStreamTick = async () => {
-        if (streamDone) return;
-        const preview = buffer.slice(0, 4000).trimEnd();
-        if (!preview) return;
-
-        if (streamMsgId === null) {
-          if (preview.length < MIN_INITIAL_CHARS || initialSending) return;
-          initialSending = true;
-          try {
-            const sent = await ctx.reply(preview, {
-              ...(isGroup && replyToId ? { reply_parameters: { message_id: replyToId } } : {}),
-            });
-            if (!streamDone) {
-              streamMsgId = sent.message_id;
-            } else {
-              // Stream finished while we were sending — delete this orphan
-              ctx.api.deleteMessage(ctx.chat!.id, sent.message_id).catch(() => {});
-            }
-          } catch {
-            initialSending = false; // allow retry next tick
-          }
-        } else {
-          // Edit with more text — plain text during streaming (partial HTML would break)
-          ctx.api.editMessageText(ctx.chat!.id, streamMsgId, preview).catch(() => {});
-        }
-      };
-
-      // Fire first check quickly (catches fast models), then keep ticking every THROTTLE_MS
-      const earlyCheck = setTimeout(doStreamTick, 150);
-      const streamTicker = setInterval(doStreamTick, THROTTLE_MS);
-
+      // ── Step 2: fetch AI response ────────────────────────────────────────
       const context = await aiService.getConversationContext(userId, chatId, 'telegram');
       const langTag = storedLang ? ` | Language: ${storedLang}` : '';
       const userMsgWithMention = `[Context: User is ${username}${langTag}]\n${message}`;
 
-      let response;
-      try {
-        response = await aiService.chatStream(context, userMsgWithMention, (chunk) => {
-          buffer += chunk; // synchronous accumulation — never blocks the stream
-        });
-      } finally {
-        streamDone = true; // tell any in-flight ticker callback to discard its send
-        clearTimeout(earlyCheck);
-        clearInterval(streamTicker);
-        clearInterval(typingTicker);
-      }
-
-      if (!response) throw new Error('Stream returned no response');
+      const response = await aiService.chat(context, userMsgWithMention);
 
       // ── Escalation ────────────────────────────────────────────────────────
       if (response.isEscalation) {
-        // Delete the live stream message if one was sent
-        if (streamMsgId) await ctx.api.deleteMessage(ctx.chat!.id, streamMsgId).catch(() => {});
-        await ctx.reply(
+        await ctx.api.editMessageText(ctx.chat!.id, statusMsgId,
           '🔔 <b>Connecting you to a human moderator</b>\n\nI could not find the answer in my knowledge base. A support agent has been notified.',
-          { parse_mode: 'HTML', ...(isGroup && replyToId ? { reply_parameters: { message_id: replyToId } } : {}) }
-        );
+          { parse_mode: 'HTML' }
+        ).catch(() => {});
         const modId = getModChatId();
         if (modId) {
           await ctx.api.sendMessage(modId, `🆘 <b>AI Escalation</b>\nUser: <code>${userId}</code>\nMsg: ${message.slice(0, 400)}`, { parse_mode: 'HTML' }).catch(() => {});
@@ -270,17 +215,19 @@ export default (bot: Bot<BotContext>) => {
         return;
       }
 
-      // ── Format final answer and replace live message with HTML version ────
+      // ── Step 3: format and replace the status message with the final answer ──
       let text = filterOutput(response.content);
       text = formatForTelegram(text);
       if (!text) text = 'You can find all official Astarter links at <a href="https://linktr.ee/Astarter">linktr.ee/Astarter</a> 🔗';
       if (isGroup) text = text.replace(/^@[\w]+\s*\n/, '');
       if (mentionPrefix) text = `${mentionPrefix}\n${text}`;
 
-      const sendChunked = async (full: string) => {
-        const chunks: string[] = [];
+      if (text.length > 4000) {
+        // Too long for one message — delete status and send as chunks
+        await ctx.api.deleteMessage(ctx.chat!.id, statusMsgId).catch(() => {});
         let current = '';
-        for (const line of full.split('\n')) {
+        const chunks: string[] = [];
+        for (const line of text.split('\n')) {
           const next = current ? current + '\n' + line : line;
           if (next.length > 3900) { if (current) chunks.push(current.trim()); current = line; }
           else current = next;
@@ -289,22 +236,9 @@ export default (bot: Bot<BotContext>) => {
         for (const chunk of chunks) {
           if (chunk) await ctx.reply(chunk, replyOpts);
         }
-      };
-
-      if (streamMsgId) {
-        if (text.length > 4000) {
-          // Too long to edit — delete the live preview, send as proper chunks
-          await ctx.api.deleteMessage(ctx.chat!.id, streamMsgId).catch(() => {});
-          await sendChunked(text);
-        } else {
-          // Replace the plain-text live preview with the final HTML version
-          await ctx.api.editMessageText(ctx.chat!.id, streamMsgId, text, { parse_mode: 'HTML' })
-            .catch(async () => ctx.reply(text, replyOpts).catch(() => {}));
-        }
       } else {
-        // Stream was very fast — no live message was sent yet, just reply normally
-        if (text.length > 4000) await sendChunked(text);
-        else await ctx.reply(text, replyOpts);
+        await ctx.api.editMessageText(ctx.chat!.id, statusMsgId, text, { parse_mode: 'HTML' })
+          .catch(() => ctx.reply(text, replyOpts).catch(() => {}));
       }
 
       // ── Feedback buttons ─────────────────────────────────────────────────
@@ -318,6 +252,9 @@ export default (bot: Bot<BotContext>) => {
       }).catch(() => {});
 
     } catch (error: any) {
+      if (statusMsgId && ctx.chat?.id) {
+        await ctx.api.deleteMessage(ctx.chat.id, statusMsgId).catch(() => {});
+      }
       console.error('AI Error:', error);
       const modId = getModChatId();
       if (modId) {
