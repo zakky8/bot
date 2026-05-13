@@ -9,7 +9,7 @@
   },
   {
     "q": "What is ABox?",
-    "a": "ABox is Astarter's core AI node device — plug-and-play hardware that lets anyone run AI agents and join the global AI economy.\n\nKey features:\n• Open Protocol via OpenClaw — compatible with LangChain, AutoGPT, and major agent frameworks\n• On-Chain Execution — built-in engine for smart contract calls and DeFi trades\n• Multi-Agent Runtime — multiple AI agents running in parallel\n• Plug-and-Play — connects to Astarter network out of the box"
+    "a": "ABox is Astarter's core AI node device — plug-and-play hardware that lets anyone run AI agents and join the global AI economy.\n\nKey features:\n• AI Agents Framework — compatible with LangChain, AutoGPT, and major agent frameworks\n• On-Chain Execution — built-in engine for smart contract calls and DeFi trades\n• Multi-Agent Runtime — multiple AI agents running in parallel\n• Plug-and-Play — connects to Astarter network out of the box"
   },
   {
     "q": "What are the ABox node tiers, prices, and how do I earn?",
@@ -28,8 +28,8 @@
     "a": "Astarter's economic flywheel:\n• Applications (DEX, prediction markets, data markets) send tasks to AI Agents\n• Agents execute and generate revenue\n• Revenue incentivizes ABox Nodes\n• Nodes provide more compute and execution capacity\n• Supports more agents and larger demand → self-reinforcing growth cycle"
   },
   {
-    "q": "What is CORE and OpenClaw?",
-    "a": "CORE is Astarter's Layer 3 Agent Layer — the autonomous AI agent platform sitting between ABox nodes (Layer 2) and applications (Layer 4). It's the intelligence and execution brain of the network, where agents execute trades, strategies, and predictions to generate revenue.\n\nOpenClaw is the open protocol powering ABox. It makes ABox compatible with major open-source AI agent frameworks (LangChain, AutoGPT, etc.), so any developer can build and deploy agents on Astarter."
+    "q": "What is CORE? What is the AI Agents framework?",
+    "a": "CORE is Astarter's Layer 3 Agent Layer — the autonomous AI agent platform sitting between ABox nodes (Layer 2) and applications (Layer 4). It's the intelligence and execution brain of the network, where agents execute trades, strategies, and predictions to generate revenue.\n\nThe AI Agents framework powers ABox and makes it compatible with major open-source AI agent frameworks (LangChain, AutoGPT, etc.), so any developer can build and deploy agents on Astarter. The framework is live on mainnet."
   },
   {
     "q": "What is Astarter's tokenomics?",
@@ -41,7 +41,7 @@
   },
   {
     "q": "What is Astarter's roadmap?",
-    "a": "Astarter roadmap:\n• 2025 Q3–Q4: ABox node deployment launch, Testnet launch\n• 2026 Q2–Q3: Mainnet launch + TGE, Astarter Grant program, native AI agent ↔ DePIN node interaction\n• 2026 Q4: ABox Agent App Store launch, major blockchain integrations, more compute nodes\n• 2027+: Automated agent-to-agent execution, next-generation Web4 agent economy"
+    "a": "Astarter roadmap:\n\n✅ 2025 Q3–Q4 — Launch Phase (Completed)\n• ABox node pre-sale open — LITE, PRO, MAX tiers all available\n• Early node operator onboarding and training\n• Cross-network integration and initial AI agent validation\n• AI Agents developer framework early access launched\n\n✅ 2026 Q1–Q2 — Ecosystem Phase (In Progress)\n• TGE tokenomics finalized (January 2026) — distribution, vesting, and listing whitelist confirmed\n• Strategic partnerships live: Zeus Network (April 2026), ENI/ENIAC (April 2026), PayGo (April 2026), MULAN Labs (May 2026)\n• ABox node billing launched (April 2026)\n• Node subscription/sales event active (April 2026)\n\n🔜 2026 Q2–Q3 — Mainnet Launch\n• Mainnet launch + TGE\n• AI Agents framework + Developer API/Docs go live\n• Astarter Grant/Startup Fund program launches\n• Live network stats: ABox nodes, AI agents, AA orders, protocol revenue\n\n🔜 2026 Q4+\n• ABox Agent App Store\n• Major blockchain integrations\n• Automated agent-to-agent economy (Web4)"
   },
   {
     "q": "Who owns Astarter? Who is behind Astarter? Who is the team?",
@@ -81,10 +81,14 @@
   },
   {
     "q": "What is the MULAN partnership? What is Mulan Labs?",
-    "a": "MULAN (Mulan Labs) is an officially integrated partner ecosystem within Astarter. MULAN is a points and NFT ecosystem with airdrop mechanics and node rewards.\n\nWhat the partnership gives MULAN holders:\n• Redeem Astarter tokens (30% quota)\n• Premium Launchpad allocations (30%)\n• Daily passive rewards via Mulan NFTs\n• Node program fee sharing\n\nAnnounced: May 2026"
+    "a": "MULAN (Mulan Labs) is an officially integrated partner of Astarter. MULAN runs a points-and-NFT ecosystem, and the integration brings AI-native payment support powered by MULAN points into Astarter.\n\nWhat the partnership gives MULAN holders:\n• Redeem Astarter tokens (30% quota)\n• Premium Launchpad allocations (30%)\n• Daily passive rewards via Mulan NFTs\n• Node program fee sharing\n\nAnnounced: May 2026\nWebsite: https://mulan.meme"
+  },
+  {
+    "q": "What developer resources does Astarter offer? Is there an SDK or API?",
+    "a": "Astarter offers three developer resources (all going live at Mainnet Q2–Q3 2026):\n\n• <b>AI Agents Framework</b> — The open ABox agent framework (formerly known as OpenClaw). Lets developers build and deploy AI agents compatible with LangChain, AutoGPT, and major frameworks. Status: Mainnet live.\n\n• <b>Developer API / Documentation</b> — Complete API and integration docs for building on Astarter. Status: Mainnet live.\n\n• <b>Startup Fund (Grant Program)</b> — Ecosystem development grants for builders launching on Astarter. Expected: Q2–Q3 2026.\n\nFor developer enquiries: contact@astarter.io"
   },
   {
     "q": "What are the major recent updates and milestones for Astarter?",
-    "a": "Recent Astarter milestones:\n\n• <b>Node Plan Launch</b> (April 2026) — The Astarter Node Plan launched. Node holders with card NFTs receive ongoing fee sharing and passive rewards.\n\n• <b>Node Subscription/Sale Event</b> (April 2026) — Node subscription opened, locking tokens at low prices for long-term revenue rights. Part of the AI-agent sector growth strategy.\n\n• <b>Pre-TGE Tokenomics Finalized</b> (January 2026) — Final tokenomics covering allocations, vesting, and listings is launch-ready. AA2 delegators are best positioned for $AA token distribution.\n\n• <b>Zeus Network Integration</b> (April 2026) — Bitcoin liquidity via zBTC extended into Astarter's multi-chain ecosystem.\n\n• <b>ENI Strategic Partnership</b> (April 2026) — Cross-chain DeFi integration and co-incubation of Web3/Web4 projects.\n\n• <b>PayGo & MULAN Partnerships</b> (May 2026) — AI-native payments and MULAN Points/NFT ecosystem integrated."
+    "a": "Recent Astarter milestones:\n\n• <b>AI Agents Framework Live</b> — The AI Agents developer framework (open ABox protocol) is live on mainnet. Fully compatible with LangChain, AutoGPT, and major agent tools.\n\n• <b>Node Plan Launch</b> (April 2026) — ABox node billing live. Card NFT holders receive ongoing fee sharing and passive rewards.\n\n• <b>Node Subscription/Sale Event</b> (April 2026) — Node subscription active. Subscribers lock tokens at pre-sale prices for long-term revenue rights.\n\n• <b>Pre-TGE Tokenomics Finalized</b> (January 2026) — Final allocations, vesting schedule, and listing whitelist confirmed. AA2 delegators are best positioned for $AA distribution.\n\n• <b>Zeus Network Partnership</b> (April 2026) — Bitcoin liquidity via zBTC integrated into Astarter's multi-chain ecosystem.\n\n• <b>ENI/ENIAC Partnership</b> (April 2026) — Enterprise modular L1 blockchain partnership; cross-chain DeFi and co-incubation of Web3/Web4 projects.\n\n• <b>PayGo Partnership</b> (April 2026) — AI-native payment (x402 protocol) integrated for cross-chain DeFi and autonomous payment scenarios.\n\n• <b>MULAN Labs Partnership</b> (May 2026) — MULAN points-and-NFT ecosystem integrated; AI-native payment support via MULAN points."
   }
 ]
