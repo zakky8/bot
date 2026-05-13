@@ -8,9 +8,7 @@ export const authMiddleware = async (ctx: BotContext, next: NextFunction) => {
     const allowed = await isAdminOrOwner(ctx);
     if (!allowed) {
       await ctx.reply(
-        '⚠️ I only work inside the project group.\n' +
-        'Ask your question there with <code>/ask</code>.',
-        { parse_mode: 'HTML' }
+        '👋 Join the Astarter community and ask your questions there:\n\nhttps://t.me/AstarterDefiHubOfficial',
       );
       return;
     }
