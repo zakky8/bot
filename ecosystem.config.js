@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'telegram-bot',
+      name: 'tenet-bot',
       script: 'npm',
       args: 'start',
       cwd: './telegram-bot',
