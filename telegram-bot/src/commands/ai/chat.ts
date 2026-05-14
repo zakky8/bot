@@ -431,12 +431,7 @@ export default (bot: Bot<BotContext>) => {
         : `<a href="tg://user?id=${author.id}">${author.first_name}</a>`;
     }
 
-    // 5. Use admin's stored language preference for the reply
-    const forceLang = !typedText
-      ? await aiService.getUserLang(ctx.from?.id?.toString() || 'unknown').catch(() => null)
-      : null;
-
-    await handleAiChat(ctx, message, mentionPrefix, forceLang);
+    await handleAiChat(ctx, message, mentionPrefix, null);
   });
 
   bot.command('support', async (ctx) => {
