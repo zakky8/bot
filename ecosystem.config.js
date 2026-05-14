@@ -2,8 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'tenet-bot',
-      script: 'npm',
-      args: 'start',
+      script: 'dist/index.js',
       cwd: './telegram-bot',
       instances: 1,
       autorestart: true,

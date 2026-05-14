@@ -49,7 +49,7 @@ async function scrapeUrl(url: string): Promise<string> {
   });
 
   const raw: string = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
-  const ct: string = (res.headers['content-type'] || '').toLowerCase();
+  const ct: string = (String(res.headers['content-type'] || '')).toLowerCase();
 
   // RSS / Atom / XML feed
   if (ct.includes('xml') || url.includes('/feed')) {
