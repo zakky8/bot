@@ -24,7 +24,7 @@ function createAIService() {
         ollamaHost:       process.env.AI_BASE_URL               || 'http://localhost:11434',
         defaultModel:     process.env.AI_MODEL                  || 'openai.gpt-oss-20b-1:0',
         fallbackModel:    process.env.AI_FALLBACK_MODEL         || 'llama3.2:3b',
-        botName:          process.env.BOT_NAME                  || 'SupportBot',
+        botName:          process.env.BOT_NAME                  || 'TENET',
         escalationUserId: process.env.HUMAN_MODERATOR_CHAT_ID  || '',
     }, redisClient, logger);
 }

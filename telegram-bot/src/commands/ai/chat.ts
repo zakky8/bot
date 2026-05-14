@@ -173,7 +173,7 @@ const BANNED_LINK_REPLACEMENTS: Array<[RegExp, string]> = [
 function filterOutput(response: string): string {
   if (EXPLICIT_CONFESSION_PATTERNS.some(p => p.test(response))) {
     console.warn('[OutputGuard] Explicit identity confession caught — replacing.');
-    return `I'm ${process.env.BOT_NAME || 'your Astarter assistant'}! What can I help you with today? 😊`;
+    return `I'm ${process.env.BOT_NAME || 'TENET'}! What can I help you with today? 😊`;
   }
   let text = response;
   for (const [pattern, replacement] of BANNED_LINK_REPLACEMENTS) {
