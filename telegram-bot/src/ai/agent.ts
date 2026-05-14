@@ -142,29 +142,34 @@ const AgentState = Annotation.Root({
 
 type S = typeof AgentState.State;
 
-// ── Node 1: Classify intent + sentiment (ONE Bedrock call, 64 tokens) ────────
-async function classify(state: S): Promise<Partial<S>> {
-  const intents = ['project','nodes','token','mulan','partnerships','roadmap','team','developers','links','general'];
-  try {
-    const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('classify timeout')), 10000)
-    );
-    const raw = await Promise.race([
-      aiService.quickChat(
-        'You are a classifier. Reply ONLY with valid JSON — no markdown, no explanation.',
-        `Message: "${state.message.slice(0, 200)}"\nReply with: {"intent":"${intents.join('|')}","sentiment":"positive|neutral|negative"}`,
-        128,
-      ),
-      timeout,
-    ]);
-    const cleaned = raw.replace(/```[\s\S]*?```/g, '').trim();
-    const data = JSON.parse(cleaned);
-    const intent    = intents.includes(data.intent)      ? data.intent    : 'general';
-    const sentiment = ['positive','neutral','negative'].includes(data.sentiment) ? data.sentiment : 'neutral';
-    return { intent, sentiment, escalate: false, escalateReason: '' };
-  } catch {
-    return { intent: 'general', sentiment: 'neutral', escalate: false, escalateReason: '' };
+// ── Node 1: Classify intent + sentiment — pure keyword matching, no LLM call ──
+const INTENT_KEYWORDS: Record<string, string[]> = {
+  nodes:        ['node','abox','pioneer','alliance','community','slot','tier','earn','reward','compute','hardware'],
+  token:        ['token','aa token','supply','emission','tge','vesting','allocation','price','listing','airdrop'],
+  mulan:        ['mulan','point','nft','star','redemption','redeem','convert','pool'],
+  partnerships: ['partner','paygo','zeus','eni','eniac','mulan labs','zbtc','bitcoin','x402'],
+  roadmap:      ['roadmap','plan','q1','q2','q3','q4','2025','2026','2027','mainnet','launch','when','timeline'],
+  team:         ['team','founder','investor','okx','emurgo','advisor','backing','backer','who made','who built'],
+  developers:   ['developer','dev','sdk','api','framework','build','grant','open source','langchain'],
+  links:        ['link','url','website','site','discord','twitter','telegram','medium','reddit','youtube','zealy','gitbook'],
+  project:      ['what is astarter','astarter is','about astarter','location','office','hq','headquarter','web4','depin','core agent'],
+};
+const NEGATIVE_WORDS = ['scam','rug','fraud','fake','lie','lying','cheat','stolen','lost','angry','frustrated','useless','terrible','worst','broken','failed','refund','sue','legal'];
+
+function classify(state: S): Partial<S> {
+  const msg = state.message.toLowerCase();
+
+  // Sentiment — keyword scan
+  const isNegative = NEGATIVE_WORDS.some(w => msg.includes(w));
+  const sentiment  = isNegative ? 'negative' : 'neutral';
+
+  // Intent — first keyword match wins; fall back to general
+  let intent = 'general';
+  for (const [key, words] of Object.entries(INTENT_KEYWORDS)) {
+    if (words.some(w => msg.includes(w))) { intent = key; break; }
   }
+
+  return { intent, sentiment, escalate: false, escalateReason: '' };
 }
 
 // ── Node 2: Sentiment — track negatives, escalate at 2 ───────────────────────
