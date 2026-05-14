@@ -1,37 +1,6 @@
 import { Bot } from 'grammy';
 import { BotContext } from '../../types';
 import { aiService } from '../../core/ai';
-import axios from 'axios';
-
-const LANGGRAPH_URL = process.env.LANGGRAPH_SERVICE_URL || 'http://127.0.0.1:8001';
-const LANGGRAPH_TIMEOUT = 25_000;
-
-interface LangGraphResponse {
-  response: string;
-  intent: string;
-  sentiment: string;
-  escalate: boolean;
-  sources: string[];
-}
-
-async function callLangGraph(
-  chatId: number,
-  message: string,
-  username?: string,
-  firstName?: string,
-  language?: string,
-): Promise<LangGraphResponse | null> {
-  try {
-    const { data } = await axios.post<LangGraphResponse>(
-      `${LANGGRAPH_URL}/chat`,
-      { chat_id: chatId, message, username, first_name: firstName, language },
-      { timeout: LANGGRAPH_TIMEOUT, headers: { 'Content-Type': 'application/json' } },
-    );
-    return data;
-  } catch {
-    return null;
-  }
-}
 
 // ── Deterministic link lookup — bypasses AI for simple link requests ──────────
 // Keyed by lowercase keywords. Matched before the AI is called, so the correct
@@ -265,31 +234,15 @@ export default (bot: Bot<BotContext>) => {
       });
       statusMsgId = statusMsg.message_id;
 
-      // ── Step 2: fetch AI response (LangGraph → fallback to aiService) ──────
+      // ── Step 2: fetch AI response ─────────────────────────────────────────
       const activeLang = detectedLang ?? forceLang;
       const langTag = activeLang ? ` | Language: ${activeLang}` : '';
 
-      let responseText: string;
-      let isEscalation = false;
-
-      const lgResult = await callLangGraph(
-        ctx.chat!.id,
-        message,
-        ctx.from?.username,
-        ctx.from?.first_name,
-        activeLang ?? undefined,
-      );
-
-      if (lgResult) {
-        responseText = lgResult.response;
-        isEscalation = lgResult.escalate;
-      } else {
-        const context = await aiService.getConversationContext(userId, chatId, 'telegram');
-        const userMsgWithMention = `[Context: User is ${username}${langTag}]\n${message}`;
-        const response = await aiService.chat(context, userMsgWithMention);
-        responseText = response.content;
-        isEscalation = response.isEscalation ?? false;
-      }
+      const context = await aiService.getConversationContext(userId, chatId, 'telegram');
+      const userMsgWithMention = `[Context: User is ${username}${langTag}]\n${message}`;
+      const response = await aiService.chat(context, userMsgWithMention);
+      const responseText = response.content;
+      const isEscalation = response.isEscalation ?? false;
 
       // ── Escalation ────────────────────────────────────────────────────────
       if (isEscalation) {

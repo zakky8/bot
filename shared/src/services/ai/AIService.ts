@@ -119,6 +119,54 @@ const INTENT_KEYWORDS: Record<string, string[]> = {
   links:        ['link', 'website', 'telegram', 'twitter', 'discord', 'medium', 'gitbook', 'social'],
 };
 
+const ANN_CHANNEL = 'https://t.me/Astarteranncmnt';
+
+// Intent-specific expert knowledge blocks injected into the dynamic prompt (Node 5 equivalent)
+const INTENT_EXPERT_BLOCKS: Record<string, string> = {
+  nodes: `## ABox Node Expert Knowledge
+Node tiers — Pioneer ($500 | 10,500 AA | 1,142 slots) · Alliance ($1,000 | 2,900 AA | 4,137 slots) · Community ($3,000 | 1,333 AA | 12,000 slots). Total: 17,279 slots.
+Earning: 10% USDT direct referral per invite · 10% Global Board Revenue (NFT mining + DPOS + ecosystem) · 20% of new nodes' daily funds by weight to all holders.
+Revenue streams: AI execution fees, compute rewards, marketplace share, DEX fee share, prediction market fees. Earning begins at mainnet (Q2–Q3 2026).
+Be honest about risks: TGE not confirmed, tokens not liquid yet.`,
+
+  token: `## AA Token Expert Knowledge
+Total supply: 1,000,000,000. Type: Utility + Governance.
+Emission: 250,000 AA/day at launch, −10% every 6 months (deflationary).
+Allocation: Ecosystem/Community 42% · Staking Mining 38% · Market Cap Management 10% · R&D 5% · Node Airdrop 4% · Community Incentives 1%.
+Vesting: Team/investors — 1-year cliff + 4-year linear. TGE: Q2–Q3 2026 target, exact date NOT confirmed. AA price NOT officially published.`,
+
+  mulan: `## MULAN Expert Knowledge
+Entry: 0.005 BNB (~$3) → 5,000 Mulan Points. Referral: Exchange ASTARTER + refer 1 address → 5,000 points.
+NFT Star daily earning: 1-STAR 1,298 pts/day · 2-STAR 2,900 · 3-STAR 16,000 · 4-STAR 75,000.
+Redemption (choose ONE for ALL points): (1) 30% AA token pool · (2) 30% Binance-listed token pool · (3) Independent exchange listing.
+CRITICAL: The 30% is the size of the token POOL reserved for MULAN holders — NOT a conversion rate for individual points. Correct any user who says "30% of my points convert".
+Node Revenue Tiers: $100→10% · $500→25% · $1,000→50% trading fee revenue share. Senior Partner: $3,000 → top-level partner + MULAN node worth $1,000.`,
+
+  partnerships: `## Partnerships Expert Knowledge
+MULAN Labs (May 2026): Referral/traffic platform. MULAN point holders get AA airdrops + NFT rewards + node fee sharing. https://mulan.meme
+PayGo (April 2026): AI-native x402 payment protocol — AI agents pay each other autonomously. https://www.paygo.ac
+Zeus Network (April 2026): Bitcoin liquidity via zBTC (1:1 BTC-pegged), cross-chain BTC into Astarter. https://zeusnetwork.xyz
+ENI/ENIAC Network (April 2026): Enterprise modular L1, cross-chain DeFi + co-incubation. https://eniac.network`,
+
+  roadmap: `## Roadmap Expert Knowledge
+2025 Q3–Q4 (COMPLETE): ABox presale, testnet, AI Agents early access.
+2026 Q1–Q2 (IN PROGRESS): Pre-TGE tokenomics, partnerships (Zeus/ENI/PayGo/MULAN), ABox Node Plan + subscription live.
+2026 Q2–Q3 (UPCOMING): Mainnet + TGE, AI DEX/Prediction/Data markets, developer API, Grant Program.
+2026 Q4: Agent App Store, EVM expansion, second node wave. 2027+: Agent-to-agent execution, Web4 full autonomy.
+TGE date is NOT officially confirmed — roadmap target only.`,
+
+  team: `## Team & Investors Expert Knowledge
+Community-driven project — no single owner publicly disclosed.
+Lead investors: OKX Ventures, EMURGO. Strategic: Adaverse, MH Ventures, Avatar Capital, 316VC, CRT Capital, Megala Ventures.
+Advisors: Sergio Sanchez (Head of Product EMURGO/Yoroi) · John O'Connor (Director African Ops IOHK/Cardano) · Darren Camas (CEO IPOR Labs).`,
+
+  developers: `## Developer Resources Expert Knowledge
+AI Agents Framework: Open-source, compatible with LangChain/AutoGPT. LIVE at mainnet.
+Developer API/Docs: Full integration docs — coming Q2–Q3 2026 at mainnet.
+Astarter Grant Program: Ecosystem grants for AI agent builders — expected Q2–Q3 2026.
+Developer community: Discord #developers https://discord.gg/XXDEjFPrgR · Enquiries: contact@astarter.io`,
+};
+
 const NEGATIVE_SIGNALS = [
   'angry', 'frustrated', 'terrible', 'awful', 'ridiculous', 'scam', 'fraud',
   'useless', 'worst', 'hate', 'stupid', 'disgusting', 'horrible', 'broken',
@@ -883,6 +931,21 @@ ${faqBlock
             : [];
         const histHits = histRaw.filter(h => h.score >= MIN_SCORE);
 
+        // Node 4: Grade chunks — if avg relevance < 0.35, retry once with shorter query
+        if (deckHits.length > 0 && topicQuery.length > 10) {
+            const gradeScore = await this.gradeChunks(topicQuery, deckHits);
+            this.logger.info(`Grader score: ${gradeScore.toFixed(3)} for "${topicQuery.slice(0, 50)}"`);
+            if (gradeScore < 0.35) {
+                const shortQ = topicQuery.split(/\s+/).slice(0, 4).join(' ');
+                const retryRaw = await this.vectorStore.searchFiltered(shortQ, 5, ['astarter_deck', 'manual']);
+                const retryHits = this.boostChunksByIntent(retryRaw.filter(h => h.score >= MIN_SCORE - 0.05), intent);
+                if (retryHits.length > 0) {
+                    deckHits = retryHits;
+                    this.logger.info(`Grader retry: ${retryHits.length} hits with "${shortQ}"`);
+                }
+            }
+        }
+
         const parts: string[] = [];
         if (deckHits.length > 0) {
             parts.push(
@@ -908,14 +971,19 @@ ${faqBlock
         }
     }
 
-    // 5. System prompt
+    // 5. System prompt — base + intent expert block (Node 5) + retrieved context
     const basePrompt = this.buildSystemPrompt(
       options?.systemPrompt ?? context.systemPrompt,
     );
 
+    const intentExpert = INTENT_EXPERT_BLOCKS[intent] ?? '';
+    const expertSection = intentExpert
+        ? `\n\n---\n# Topic Expert Context\n${intentExpert}`
+        : '';
+
     const dynamicPrompt = ragContext
-        ? `${basePrompt}\n\n---\n# Retrieved Context\nThe following was retrieved from the verified knowledge base for this specific question. It is factual and current. Use it to answer directly and confidently — do NOT say "I'm not sure", "hasn't been confirmed", or "I don't have that info" when the answer is below. Paraphrase naturally; do not copy-paste.\n\n${ragContext}`
-        : basePrompt;
+        ? `${basePrompt}${expertSection}\n\n---\n# Retrieved Context\nThe following was retrieved from the verified knowledge base for this specific question. It is factual and current. Use it to answer directly and confidently — do NOT say "I'm not sure", "hasn't been confirmed", or "I don't have that info" when the answer is below. Paraphrase naturally; do not copy-paste.\n\n${ragContext}`
+        : `${basePrompt}${expertSection}`;
 
     // 6. Call AI provider
     let response: AIResponse | undefined;
@@ -1311,6 +1379,23 @@ ${faqBlock
           : c.score,
       }))
       .sort((a, b) => b.score - a.score);
+  }
+
+  // Node 4: Grade chunk relevance — single Bedrock call, returns avg score 0-1
+  private async gradeChunks(query: string, chunks: { pageContent: string; score: number }[]): Promise<number> {
+    if (!this.bedrock || chunks.length === 0) return 1.0;
+    const items = chunks.map((c, i) => `[${i + 1}] ${c.pageContent.slice(0, 200)}`).join('\n\n');
+    try {
+      const result = await this.generateWithAWS(
+        [{ role: 'user', content: `Query: "${query.slice(0, 150)}"\n\nChunks:\n${items}\n\nScore each chunk 0.0–1.0 for relevance. Reply ONLY with a JSON array: [0.8, 0.3, ...]` }],
+        'You are a relevance grader. Reply only with a JSON number array, nothing else.',
+      );
+      const scores = JSON.parse(result.content.trim()) as number[];
+      if (!Array.isArray(scores) || scores.length === 0) return 0.5;
+      return scores.reduce((a, b) => a + b, 0) / scores.length;
+    } catch {
+      return 0.5;
+    }
   }
 
   private async trackNegativeSentiment(userId: string, sentiment: string): Promise<boolean> {
