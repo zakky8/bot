@@ -188,10 +188,18 @@ function checkSentiment(state: S): Partial<S> {
 
 // ── Node 3: Retrieve relevant chunks ─────────────────────────────────────────
 async function retrieve(state: S): Promise<Partial<S>> {
-  const query = state.message;
-  const raw = await aiService.searchDocs(query, 5, ['astarter_deck', 'manual']);
-  const chunks = raw.filter(c => c.score >= 0.32);
-  return { chunks };
+  try {
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('retrieve timeout')), 8000)
+    );
+    const raw = await Promise.race([
+      aiService.searchDocs(state.message, 5, ['astarter_deck', 'manual']),
+      timeout,
+    ]);
+    return { chunks: raw.filter(c => c.score >= 0.32) };
+  } catch {
+    return { chunks: [] }; // skip RAG — still answers from system prompt knowledge
+  }
 }
 
 // ── Node 4: Generate response ─────────────────────────────────────────────────
@@ -223,7 +231,7 @@ async function generate(state: S): Promise<Partial<S>> {
     );
     response = await Promise.race([aiService.quickChat(system, userPrompt, 1024), timeout]);
   } catch {
-    response = `I'm having trouble right now. Please check ${ANN} for the latest updates.`;
+    response = `I'm having trouble right now. Please check the announcements channel for the latest updates.`;
   }
 
   return {
@@ -264,7 +272,7 @@ function outputCheck(state: S): Partial<S> {
 
   // Dead-end fallback
   if (!text.trim() || text.trim().length < 10) {
-    text = `I don't have confirmed details on that yet — check ${ANN} for the latest updates.`;
+    text = `I don't have confirmed details on that yet — check the announcements channel for the latest updates.`;
   }
 
   return { response: text };
