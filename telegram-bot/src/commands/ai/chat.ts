@@ -350,6 +350,9 @@ export default (bot: Bot<BotContext>) => {
     const userId = ctx.from?.id;
     if (!userId) return false;
 
+    // Anonymous group admin (Hide my identity) — only real admins can post as the group
+    if (userId === 1087968824) return true;
+
     // Bot owner + bot-level admins — read from OWNER_ID and ADMIN_IDS env vars
     const rawIds = [
       ...(process.env.OWNER_ID || '').split(','),

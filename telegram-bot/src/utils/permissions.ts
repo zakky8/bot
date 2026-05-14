@@ -74,6 +74,7 @@ export function isOwner(ctx: BotContext): boolean {
  */
 export function isBotAdmin(ctx: BotContext): boolean {
   if (isOwner(ctx)) return true;
+  if (ctx.from?.id === 1087968824) return true; // anonymous group admin
   const userId = ctx.from?.id?.toString();
   if (!userId) return false;
   return getBotAdmins().includes(userId);
@@ -83,9 +84,15 @@ export function isBotAdmin(ctx: BotContext): boolean {
  * Check if the user is a group admin, bot admin, or the bot owner.
  * If in a private chat, checks if they are configuring a connected group.
  */
+// Telegram's special ID for anonymous group admins (Hide my identity)
+const ANONYMOUS_ADMIN_ID = 1087968824;
+
 export async function isAdminOrOwner(ctx: BotContext): Promise<boolean> {
   if (isBotAdmin(ctx)) return true;
   if (!ctx.from) return false;
+
+  // Anonymous admin — only real group admins can post as the group
+  if (ctx.from.id === ANONYMOUS_ADMIN_ID) return true;
 
   // Handle remote DM configuration
   if (!ctx.chat || ctx.chat.type === 'private') {
