@@ -231,7 +231,6 @@ export default (bot: Bot<BotContext>) => {
         date: new Date().toISOString(),
         added_by: ctx.from?.id,
       });
-      notifyLangGraphReload();
       return ctx.reply(`✅ Text indexed! (${inputText.length.toLocaleString()} chars)`);
     } catch (err: any) {
       console.error('[adddoc text]', err);
