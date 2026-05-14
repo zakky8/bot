@@ -1,6 +1,7 @@
 import { Bot } from 'grammy';
 import { BotContext } from '../../types';
 import { aiService } from '../../core/ai';
+import { runAgent } from '../../ai/agent';
 
 // ── Deterministic link lookup — bypasses AI for simple link requests ──────────
 // Keyed by lowercase keywords. Matched before the AI is called, so the correct
@@ -234,15 +235,17 @@ export default (bot: Bot<BotContext>) => {
       });
       statusMsgId = statusMsg.message_id;
 
-      // ── Step 2: fetch AI response ─────────────────────────────────────────
+      // ── Step 2: run LangGraph agent ───────────────────────────────────────
       const activeLang = detectedLang ?? forceLang;
-      const langTag = activeLang ? ` | Language: ${activeLang}` : '';
 
-      const context = await aiService.getConversationContext(userId, chatId, 'telegram');
-      const userMsgWithMention = `[Context: User is ${username}${langTag}]\n${message}`;
-      const response = await aiService.chat(context, userMsgWithMention);
-      const responseText = response.content;
-      const isEscalation = response.isEscalation ?? false;
+      const result = await runAgent(
+        ctx.chat!.id,
+        userId,
+        message,
+        activeLang ?? null,
+      );
+      const responseText = result.response;
+      const isEscalation = result.escalate;
 
       // ── Escalation ────────────────────────────────────────────────────────
       if (isEscalation) {

@@ -715,10 +715,23 @@ ${faqBlock
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  /** Public single-turn call — used by the LangGraph agent nodes for classify/generate */
+  async quickChat(systemPrompt: string, userMessage: string, maxTokens = 512): Promise<string> {
+    if (!this.bedrock) throw new Error('Bedrock not initialised');
+    const resp = await this.generateWithAWS(
+      [{ role: 'user', content: userMessage }],
+      systemPrompt,
+      undefined,
+      maxTokens,
+    );
+    return resp.content;
+  }
+
   private async generateWithAWS(
     messages: AIMessage[],
     systemPrompt: string,
     model?: string,
+    maxTokensOverride?: number,
   ): Promise<AIResponse> {
     if (!this.bedrock) throw new Error('AWS Bedrock not initialised');
 
@@ -765,7 +778,7 @@ ${faqBlock
             content: [{ text: m.content }]
           })),
           inferenceConfig: {
-            maxTokens: this.config.maxTokens || 800,
+            maxTokens: maxTokensOverride ?? this.config.maxTokens ?? 800,
             // Low temperature (0.1) = factual, grounded answers, far less hallucination.
             // topP (0.5) = restricts to top 50% likely tokens, prevents creative drift.
             temperature: 0.1,
@@ -930,21 +943,6 @@ ${faqBlock
             ? await this.vectorStore.searchFiltered(ragQuery, 2, ['telegram_history'])
             : [];
         const histHits = histRaw.filter(h => h.score >= MIN_SCORE);
-
-        // Node 4: Grade chunks — if avg relevance < 0.35, retry once with shorter query
-        if (deckHits.length > 0 && topicQuery.length > 10) {
-            const gradeScore = await this.gradeChunks(topicQuery, deckHits);
-            this.logger.info(`Grader score: ${gradeScore.toFixed(3)} for "${topicQuery.slice(0, 50)}"`);
-            if (gradeScore < 0.35) {
-                const shortQ = topicQuery.split(/\s+/).slice(0, 4).join(' ');
-                const retryRaw = await this.vectorStore.searchFiltered(shortQ, 5, ['astarter_deck', 'manual']);
-                const retryHits = this.boostChunksByIntent(retryRaw.filter(h => h.score >= MIN_SCORE - 0.05), intent);
-                if (retryHits.length > 0) {
-                    deckHits = retryHits;
-                    this.logger.info(`Grader retry: ${retryHits.length} hits with "${shortQ}"`);
-                }
-            }
-        }
 
         const parts: string[] = [];
         if (deckHits.length > 0) {
