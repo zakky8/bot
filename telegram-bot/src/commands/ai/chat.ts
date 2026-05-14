@@ -150,7 +150,11 @@ function formatForTelegram(raw: string): string {
     return ''; // strip everything else
   });
 
-  // 6. Collapse 3+ newlines → 2
+  // 6. Flatten nested dashes/hyphens → bullet (• )
+  // Catches lines like "  – item", "  - item", "   — item" regardless of indent depth
+  text = text.replace(/^[ \t]*[–—-][ \t]+/gm, '• ');
+
+  // 7. Collapse 3+ newlines → 2
   text = text.replace(/\n{3,}/g, '\n\n').trim();
   return text;
 }
