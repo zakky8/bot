@@ -1,6 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { BedrockRuntimeClient, ConverseCommand, ConverseStreamCommand } from '@aws-sdk/client-bedrock-runtime';
-import { Ollama } from 'ollama';
 import { Redis } from 'ioredis';
 import { Logger } from 'winston';
 import * as fs from 'fs';
@@ -16,7 +15,7 @@ export interface AIMessage {
 export interface AIResponse {
   content: string;
   model: string;
-  provider: 'anthropic' | 'aws' | 'ollama';
+  provider: 'anthropic' | 'aws';
   tokensUsed?: number;
   cost?: number;
   /** true when AI signalled it cannot answer and a human should follow up */
@@ -28,11 +27,8 @@ export interface AIConfig {
   awsAccessKey?: string;
   awsSecretKey?: string;
   awsRegion?: string;
-  ollamaHost?: string;
-  /** Primary Claude model. Default: claude-sonnet-4-6 */
+  /** Primary model. Default: amazon.nova-lite-v1:0 */
   defaultModel?: string;
-  /** Ollama model used as fallback. Default: llama3.2:3b */
-  fallbackModel?: string;
   maxTokens?: number;
   temperature?: number;
   /** Bot name shown in the system prompt */
@@ -67,7 +63,7 @@ interface LogEntry {
   chatId?: string;
   platform: 'discord' | 'telegram';
   model: string;
-  provider: 'anthropic' | 'aws' | 'ollama';
+  provider: 'anthropic' | 'aws';
   tokensUsed: number;
   cost: number;
 }
@@ -76,7 +72,7 @@ interface UsageStats {
   totalRequests: number;
   totalTokens: number;
   totalCost: number;
-  byProvider: { anthropic: number; aws: number; ollama: number };
+  byProvider: { anthropic: number; aws: number };
   uniqueUsers: number;
 }
 
@@ -208,7 +204,6 @@ const ALLOWED_URLS = new Set([
 export class AIService {
   private anthropic?: Anthropic;
   private bedrock?: BedrockRuntimeClient;
-  private ollama?: Ollama;
   private redis: Redis | any;
   private logger: Logger;
   private config: Required<AIConfig>;
@@ -225,9 +220,7 @@ export class AIService {
       awsAccessKey:      config.awsAccessKey      ?? '',
       awsSecretKey:      config.awsSecretKey      ?? '',
       awsRegion:         config.awsRegion         ?? 'us-east-1',
-      ollamaHost:        config.ollamaHost        ?? 'http://localhost:11434',
       defaultModel:      config.defaultModel      ?? 'amazon.nova-lite-v1:0',
-      fallbackModel:     config.fallbackModel     ?? 'llama3.2:3b',
       maxTokens:         config.maxTokens         ?? 2000,
       temperature:       config.temperature       ?? 0.7,
       botName:           config.botName           ?? 'TENET',
@@ -289,13 +282,6 @@ export class AIService {
       }
     }
 
-    // Ollama (fallback)
-    try {
-      this.ollama = new Ollama({ host: this.config.ollamaHost });
-      this.logger.info('Ollama fallback initialised');
-    } catch (err) {
-      this.logger.error('Failed to initialise Ollama:', err);
-    }
   }
 
 
@@ -819,30 +805,11 @@ ${faqBlock
   }
 
 
-  private async generateWithOllama(messages: AIMessage[], model?: string): Promise<AIResponse> {
-    if (!this.ollama) throw new Error('Ollama not initialised');
-
-    const modelToUse = model ?? this.config.fallbackModel;
-
-    const response = await this.ollama.chat({
-      model: modelToUse,
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
-      options:  { temperature: this.config.temperature, num_predict: this.config.maxTokens },
-    });
-
-    const text = response.message?.content?.trim();
-    if (!text) throw new Error('Empty response from Ollama');
-
-    return { content: text, model: modelToUse, provider: 'ollama' };
-  }
-
-
   async chat(
     context: ConversationContext,
     userMessage: string,
     options?: {
       model?: string;
-      useOllamaOnly?: boolean;
       saveContext?: boolean;
       systemPrompt?: string;
     },
@@ -985,42 +952,21 @@ ${faqBlock
     let response: AIResponse | undefined;
 
     try {
-      if (!options?.useOllamaOnly && this.anthropic) {
+      if (this.anthropic) {
         response = await this.generateWithAnthropic(messages, dynamicPrompt, options?.model);
-      } else if (!options?.useOllamaOnly && this.bedrock) {
+      } else if (this.bedrock) {
         response = await this.generateWithAWS(messages, dynamicPrompt, options?.model);
-      } else if (this.ollama) {
-        const fullMessages: AIMessage[] = [
-          { role: 'system', content: dynamicPrompt },
-          ...messages,
-        ];
-        response = await this.generateWithOllama(fullMessages, options?.model);
       } else {
         throw new Error('No AI provider available. Set ANTHROPIC_API_KEY or AWS credentials in .env.');
       }
     } catch (err) {
-      // Fallback Chain: Anthropic -> AWS -> Ollama
-      if (!options?.useOllamaOnly && this.bedrock && (!response || response.provider !== 'aws')) {
-          this.logger.warn('Primary provider failed — falling back to AWS Bedrock');
-          try {
-            response = await this.generateWithAWS(messages, dynamicPrompt, options?.model);
-          } catch (awsErr) {
-            this.logger.error('AWS Bedrock fallback also failed:', awsErr);
-            // continue to Ollama
-          }
-      }
-
-      if (!response && this.ollama) {
-        this.logger.warn('Falling back to Ollama');
+      // Fallback: Anthropic → AWS Bedrock
+      if (this.bedrock && (!response || response.provider !== 'aws')) {
+        this.logger.warn('Primary provider failed — falling back to AWS Bedrock');
         try {
-          const fullMessages: AIMessage[] = [
-            { role: 'system', content: dynamicPrompt },
-            ...messages,
-          ];
-          response = await this.generateWithOllama(fullMessages, options?.model);
-
-        } catch (fallbackErr) {
-          this.logger.error('All AI providers failed or none are configured.');
+          response = await this.generateWithAWS(messages, dynamicPrompt, options?.model);
+        } catch (awsErr) {
+          this.logger.error('AWS Bedrock fallback also failed:', awsErr);
           throw new Error('All AI providers failed. Check your API keys and region settings.');
         }
       } else if (!response) {
@@ -1101,15 +1047,14 @@ ${faqBlock
       byProvider: {
         anthropic: logs.filter((l) => l.provider === 'anthropic').length,
         aws:       logs.filter((l) => l.provider === 'aws').length,
-        ollama:    logs.filter((l) => l.provider === 'ollama').length,
       },
       uniqueUsers: new Set(logs.map((l) => l.userId)).size,
     };
   }
 
 
-  async listAvailableModels(): Promise<{ anthropic: string[]; aws: string[]; ollama: string[] }> {
-    const result = { anthropic: [] as string[], aws: [] as string[], ollama: [] as string[] };
+  async listAvailableModels(): Promise<{ anthropic: string[]; aws: string[] }> {
+    const result = { anthropic: [] as string[], aws: [] as string[] };
 
     if (this.anthropic) {
       result.anthropic = [
@@ -1123,15 +1068,6 @@ ${faqBlock
         'anthropic.claude-3-haiku-20240307-v1:0',
         'anthropic.claude-3-sonnet-20240229-v1:0',
       ];
-    }
-
-    if (this.ollama) {
-      try {
-        const { models } = await this.ollama.list();
-        result.ollama = models.map((m) => m.name);
-      } catch (err) {
-        this.logger.error('Failed to list Ollama models:', err);
-      }
     }
 
     return result;
@@ -1278,8 +1214,8 @@ ${faqBlock
     // Stream from provider
     let fullText = '';
     let tokensUsed = 0;
-    let provider: 'anthropic' | 'aws' | 'ollama' = 'aws';
-    let usedModel = options?.model ?? this.config.defaultModel;
+    let provider: 'anthropic' | 'aws' = 'aws';
+    const usedModel = options?.model ?? this.config.defaultModel;
 
     try {
       if (this.anthropic) {
@@ -1288,33 +1224,19 @@ ${faqBlock
       } else if (this.bedrock) {
         const r = await this.streamWithAWS(messages, dynamicPrompt, onChunk, options?.model);
         fullText = r.text; provider = 'aws';
-      } else if (this.ollama) {
-        const r = await this.generateWithOllama([{ role: 'system', content: dynamicPrompt }, ...messages], options?.model);
-        fullText = r.content; provider = 'ollama'; usedModel = r.model;
-        onChunk(r.content); // synchronous — onChunk is void, not async
       } else {
         throw new Error('No AI provider available.');
       }
     } catch (err: any) {
-      // Fallback chain: Anthropic → Bedrock → Ollama
+      // Fallback: Anthropic → Bedrock
       if (provider === 'anthropic' && this.bedrock) {
         this.logger.warn('Anthropic stream failed — falling back to Bedrock');
         try {
           const r = await this.streamWithAWS(messages, dynamicPrompt, onChunk, options?.model);
           fullText = r.text; provider = 'aws';
         } catch (bedrockErr) {
-          if (this.ollama) {
-            this.logger.warn('Bedrock stream also failed — falling back to Ollama');
-            const r = await this.generateWithOllama([{ role: 'system', content: dynamicPrompt }, ...messages], options?.model);
-            fullText = r.content; provider = 'ollama'; usedModel = r.model;
-            onChunk(r.content);
-          } else { throw bedrockErr; }
+          throw bedrockErr;
         }
-      } else if (provider === 'aws' && this.ollama) {
-        this.logger.warn('Bedrock stream failed — falling back to Ollama');
-        const r = await this.generateWithOllama([{ role: 'system', content: dynamicPrompt }, ...messages], options?.model);
-        fullText = r.content; provider = 'ollama'; usedModel = r.model;
-        onChunk(r.content);
       } else { throw err; }
     }
 
@@ -1431,8 +1353,8 @@ ${faqBlock
     } catch {}
   }
 
-  async testConnection(): Promise<{ anthropic: boolean; aws: boolean; ollama: boolean }> {
-    const result = { anthropic: false, aws: false, ollama: false };
+  async testConnection(): Promise<{ anthropic: boolean; aws: boolean }> {
+    const result = { anthropic: false, aws: false };
 
     if (this.anthropic) {
       try {
@@ -1456,15 +1378,6 @@ ${faqBlock
         result.aws = true;
       } catch (err) {
         this.logger.error('AWS Bedrock connection test failed:', err);
-      }
-    }
-
-    if (this.ollama) {
-      try {
-        await this.ollama.list();
-        result.ollama = true;
-      } catch (err) {
-        this.logger.error('Ollama connection test failed:', err);
       }
     }
 
