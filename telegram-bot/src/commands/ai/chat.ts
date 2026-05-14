@@ -334,14 +334,37 @@ export default (bot: Bot<BotContext>) => {
     }
   };
 
-  // Remove auto-chat logic. AI now only responds via /ask command.
-  
-  // /ask and /ai are identical — both trigger the AI chat handler
-  const askHandler = async (ctx: BotContext) => {
+  // ── Helper: check if the calling user is a group admin/creator or bot owner ──
+  const isAdminOrOwner = async (ctx: BotContext): Promise<boolean> => {
+    const userId = ctx.from?.id;
+    if (!userId) return false;
 
+    // Bot owner / super-admin IDs from env (comma-separated Telegram user IDs)
+    const ownerIds = (process.env.ADMIN_IDS || '')
+      .split(',')
+      .map(id => parseInt(id.trim(), 10))
+      .filter(n => !isNaN(n));
+    if (ownerIds.includes(userId)) return true;
+
+    // In groups: check Telegram admin status
+    if (ctx.chat?.type !== 'private') {
+      try {
+        const member = await ctx.getChatMember(userId);
+        return ['creator', 'administrator'].includes(member.status);
+      } catch {
+        return false;
+      }
+    }
+
+    // Private chats: only bot owners (already checked above)
+    return false;
+  };
+
+  // ── /ask — public question command (typed text only) ─────────────────────────
+  bot.command('ask', async (ctx: BotContext) => {
     const typedText = (ctx.match as string)?.trim();
 
-    // clear must match only explicitly typed text, never a replied message
+    // clear conversation history
     if (typedText?.toLowerCase() === 'clear') {
       const userId = ctx.from?.id?.toString() || 'unknown';
       const chatId = ctx.chat?.id?.toString();
@@ -349,57 +372,65 @@ export default (bot: Bot<BotContext>) => {
       return ctx.reply('🗑️ Conversation history cleared.');
     }
 
-    let message = typedText;
-
-    // Reply-to support: /ai sent as a reply to another message
-    const repliedMsg = ctx.message?.reply_to_message;
-    let mentionPrefix = '';
-
-    if (repliedMsg) {
-      const repliedText = (repliedMsg.text || repliedMsg.caption || '').trim();
-      if (!repliedText) {
-        return ctx.reply(
-          '💬 That message has no text. Reply to a text message or type your question after <code>/ai</code>.',
-          { parse_mode: 'HTML' }
-        );
-      }
-      const safeRepliedText = repliedText.slice(0, 1000);
-      if (!message) {
-        message = safeRepliedText;
-      } else {
-        message = `${message}\n\n[Referring to: "${safeRepliedText}"]`;
-      }
-
-      // Build mention for the original message author (C) so they get notified
-      const isGroup = ctx.chat?.type !== 'private';
-      const author = repliedMsg.from;
-      if (isGroup && author && !author.is_bot && author.id !== ctx.from?.id) {
-        mentionPrefix = author.username
-          ? `@${author.username}`
-          : `<a href="tg://user?id=${author.id}">${author.first_name}</a>`;
-      }
-    }
-
-    if (!message) {
+    // Must have typed text — /ask does not read replied messages
+    if (!typedText) {
       return ctx.reply(
-        `💬 Usage: <code>/ask &lt;your question&gt;</code> or reply to any message with <code>/ask</code>`,
+        `💬 Usage: <code>/ask &lt;your question&gt;</code>`,
         { parse_mode: 'HTML' }
       );
     }
 
-    // If /ai was used as a pure reply (no text typed), fetch the sender's stored
-    // language so the reply comes back in their language, not the replied message's.
-    let forceLang: string | null = null;
-    if (!typedText && ctx.message?.reply_to_message) {
-      const userId = ctx.from?.id?.toString() || 'unknown';
-      forceLang = await aiService.getUserLang(userId).catch(() => null);
+    await handleAiChat(ctx, typedText, '', null);
+  });
+
+  // ── /ai — admin-only reply reader ────────────────────────────────────────────
+  bot.command('ai', async (ctx: BotContext) => {
+    // 1. Admin gate
+    if (!await isAdminOrOwner(ctx)) {
+      return ctx.reply('🔒 This command is for admins only.');
     }
 
-    await handleAiChat(ctx, message, mentionPrefix, forceLang);
-  };
+    // 2. Must be used as a reply to a message
+    const repliedMsg = ctx.message?.reply_to_message;
+    if (!repliedMsg) {
+      return ctx.reply(
+        `💬 Usage: reply to any message with <code>/ai</code>`,
+        { parse_mode: 'HTML' }
+      );
+    }
 
-  bot.command('ask', askHandler);
-  bot.command('ai', askHandler);
+    const repliedText = (repliedMsg.text || repliedMsg.caption || '').trim();
+    if (!repliedText) {
+      return ctx.reply(
+        '💬 That message has no text. Reply to a text message with <code>/ai</code>.',
+        { parse_mode: 'HTML' }
+      );
+    }
+
+    // 3. Build the message — replied text is always the base context
+    const typedText = (ctx.match as string)?.trim();
+    const safeRepliedText = repliedText.slice(0, 1000);
+    const message = typedText
+      ? `${typedText}\n\n[Referring to: "${safeRepliedText}"]`
+      : safeRepliedText;
+
+    // 4. Mention the original message author so they get notified
+    let mentionPrefix = '';
+    const isGroup = ctx.chat?.type !== 'private';
+    const author = repliedMsg.from;
+    if (isGroup && author && !author.is_bot && author.id !== ctx.from?.id) {
+      mentionPrefix = author.username
+        ? `@${author.username}`
+        : `<a href="tg://user?id=${author.id}">${author.first_name}</a>`;
+    }
+
+    // 5. Use admin's stored language preference for the reply
+    const forceLang = !typedText
+      ? await aiService.getUserLang(ctx.from?.id?.toString() || 'unknown').catch(() => null)
+      : null;
+
+    await handleAiChat(ctx, message, mentionPrefix, forceLang);
+  });
 
   bot.command('support', async (ctx) => {
     // Support command remains for everyone to reach mods
