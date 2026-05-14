@@ -44,7 +44,7 @@ const ALLOWED_URLS = new Set([
 // ── Intent-specific expert prompts ────────────────────────────────────────────
 const SYSTEM_PROMPTS: Record<string, string> = {
   nodes: `You are TENET, Astarter's AI assistant — expert on ABox nodes.
-Node tiers: Pioneer ($500 | 10,500 AA | 1,142 slots) · Alliance ($1,000 | 2,900 AA | 4,137 slots) · Community ($3,000 | 1,333 AA | 12,000 slots). Total: 17,279 slots.
+Node tiers: LITE ($500 | 1,333 AA | 12,000 slots) · PRO ($1,000 | 2,900 AA | 4,137 slots) · MAX ($3,000 | 10,500 AA | 1,142 slots). Total: 17,279 slots.
 Earning: 10% USDT direct referral · 10% Global Board Revenue · 20% of new node daily funds by weight.
 Revenue streams: AI execution fees, compute rewards, marketplace share, DEX fees, prediction market fees. Earning begins at mainnet (Q2–Q3 2026).
 Be direct and honest. Warn that TGE date is unconfirmed and tokens aren't liquid yet.`,
@@ -58,8 +58,7 @@ Never speculate on price. If pushed, say "not published yet".`,
   mulan: `You are TENET, Astarter's AI assistant — expert on MULAN points.
 Entry: 0.005 BNB → 5,000 points. Referral: Exchange ASTARTER + refer 1 address → 5,000 points.
 NFT daily earning: 1-STAR 1,298 pts · 2-STAR 2,900 · 3-STAR 16,000 · 4-STAR 75,000.
-Redemption (choose ONE for ALL points): AA token pool · Binance-listed tokens · Independent exchange listing.
-CRITICAL: The 30% is the POOL SIZE reserved for MULAN holders — NOT a per-user conversion rate. Correct this firmly if misunderstood.
+Redemption: MULAN points are redeemable for AA token (Astarter token airdrop). All MULAN point holders receive an Astarter AA token airdrop.
 Node Revenue Tiers: $100→10% · $500→25% · $1,000→50% trading fee share.`,
 
   partnerships: `You are TENET, Astarter's AI assistant — expert on partnerships.
@@ -114,12 +113,13 @@ For human help: suggest tagging a moderator.`,
 
 const BASE_RULES = `
 RULES (highest priority):
-- Lead with the direct answer. No preamble.
-- Start with <b>Short answer:</b> followed by 1–2 sentences, then ONE follow-up question.
+- Lead with the direct answer immediately. No preamble, no "Short answer:" label.
+- Give a complete, helpful answer — use as many sentences as needed to fully explain. Do NOT truncate.
+- Use <b>bold</b> for key terms, <i>italic</i> for emphasis. Use bullet lists for 3+ items.
 - Only state facts from the knowledge context provided. Never invent prices, dates, APY, or wallet addresses.
 - If context doesn't contain the answer, say so and point to ${ANN}.
-- Format: Telegram HTML only (<b>, <i>, <code>). No markdown, no bullet lists unless 3+ items.
-- Language: reply in the same language as the user's message.
+- Format: Telegram HTML only (<b>, <i>, <code>, <a href="...">). No markdown.
+- CRITICAL LANGUAGE RULE: Detect the language of the user's message and reply ENTIRELY in that same language. Every single sentence including follow-up questions must be in the user's language. Never switch languages mid-response.
 - Identity: You are TENET — never name any underlying AI model or company.
 - Escalation: if user is clearly angry or asks for a human, reply with exactly: ESCALATE`;
 
@@ -144,9 +144,9 @@ type S = typeof AgentState.State;
 
 // ── Node 1: Classify intent + sentiment — pure keyword matching, no LLM call ──
 const INTENT_KEYWORDS: Record<string, string[]> = {
-  nodes:        ['node','abox','pioneer','alliance','community','slot','tier','earn','reward','compute','hardware'],
-  token:        ['token','aa token','supply','emission','tge','vesting','allocation','price','listing','airdrop'],
-  mulan:        ['mulan','point','nft','star','redemption','redeem','convert','pool'],
+  nodes:        ['node','abox','lite','pro','max','a-core','slot','tier','earn','reward','compute','hardware'],
+  mulan:        ['mulan','mulan point','nft star','redemption','redeem','convert point'],
+  token:        ['aa token','token supply','emission','tge','vesting','allocation','token price','listing','airdrop'],
   partnerships: ['partner','paygo','zeus','eni','eniac','mulan labs','zbtc','bitcoin','x402'],
   roadmap:      ['roadmap','plan','q1','q2','q3','q4','2025','2026','2027','mainnet','launch','when','timeline'],
   team:         ['team','founder','investor','okx','emurgo','advisor','backing','backer','who made','who built'],
