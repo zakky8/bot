@@ -149,7 +149,7 @@ async function classify(state: S): Promise<Partial<S>> {
     const raw = await aiService.quickChat(
       'You are a classifier. Reply ONLY with valid JSON — no markdown, no explanation.',
       `Message: "${state.message.slice(0, 200)}"\nReply with: {"intent":"${intents.join('|')}","sentiment":"positive|neutral|negative"}`,
-      64,
+      128,
     );
     const cleaned = raw.replace(/```[\s\S]*?```/g, '').trim();
     const data = JSON.parse(cleaned);
