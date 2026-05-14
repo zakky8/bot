@@ -119,8 +119,6 @@ const INTENT_KEYWORDS: Record<string, string[]> = {
   links:        ['link', 'website', 'telegram', 'twitter', 'discord', 'medium', 'gitbook', 'social'],
 };
 
-const ANN_CHANNEL = 'https://t.me/Astarteranncmnt';
-
 // Intent-specific expert knowledge blocks injected into the dynamic prompt (Node 5 equivalent)
 const INTENT_EXPERT_BLOCKS: Record<string, string> = {
   nodes: `## ABox Node Expert Knowledge

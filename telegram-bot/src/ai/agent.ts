@@ -153,15 +153,15 @@ async function classify(state: S): Promise<Partial<S>> {
     const data = JSON.parse(cleaned);
     const intent    = intents.includes(data.intent)      ? data.intent    : 'general';
     const sentiment = ['positive','neutral','negative'].includes(data.sentiment) ? data.sentiment : 'neutral';
-    return { intent, sentiment };
+    return { intent, sentiment, escalate: false, escalateReason: '' };
   } catch {
-    return { intent: 'general', sentiment: 'neutral' };
+    return { intent: 'general', sentiment: 'neutral', escalate: false, escalateReason: '' };
   }
 }
 
 // ── Node 2: Sentiment — track negatives, escalate at 2 ───────────────────────
 function checkSentiment(state: S): Partial<S> {
-  const neg = state.sentiment === 'negative' ? (state.negativeCount ?? 0) + 1 : state.negativeCount ?? 0;
+  const neg = state.sentiment === 'negative' ? (state.negativeCount ?? 0) + 1 : 0;
   if (neg >= 2) {
     return {
       negativeCount: neg,
