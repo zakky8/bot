@@ -725,17 +725,8 @@ ${faqBlock
 
     // AWS Bedrock cross-region inference: only Anthropic models need a regional prefix
     // (eu./us./ap.). OpenAI, Meta, Mistral etc. use their model ID as-is.
-    if (modelToUse.startsWith('anthropic.')) {
-      const region = this.config.awsRegion ?? 'us-east-1';
-      const bareModel = modelToUse.replace(/^(eu|us|ap)\./, '');
-      if (region.startsWith('eu-')) {
-        modelToUse = `eu.${bareModel}`;
-      } else if (region.startsWith('ap-')) {
-        modelToUse = `ap.${bareModel}`;
-      } else {
-        modelToUse = `us.${bareModel}`;
-      }
-    }
+    // Use model ID as-is — cross-region prefix (ap./eu./us.) is only needed
+    // for cross-region inference profiles, not for direct model access.
 
     // Sanitise messages before sending — Bedrock requires strict alternation
     const sanitized = this.sanitizeMessagesForBedrock(messages);
@@ -1117,11 +1108,7 @@ ${faqBlock
 
     if (!modelToUse) throw new Error('No model configured for AWS Bedrock');
 
-    if (modelToUse.startsWith('anthropic.')) {
-      const region = this.config.awsRegion ?? 'us-east-1';
-      const bare = modelToUse.replace(/^(eu|us|ap)\./, '');
-      modelToUse = region.startsWith('eu-') ? `eu.${bare}` : region.startsWith('ap-') ? `ap.${bare}` : `us.${bare}`;
-    }
+    // Use model ID as-is — no cross-region prefix needed for direct model access.
 
     const sanitized = this.sanitizeMessagesForBedrock(messages);
     if (sanitized.length === 0) throw new Error('No valid messages after sanitisation');
