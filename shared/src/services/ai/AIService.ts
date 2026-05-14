@@ -107,6 +107,24 @@ const INJECTION_PHRASES: string[] = [
 
 const MAX_INPUT_LENGTH = 1000;
 
+const INTENT_KEYWORDS: Record<string, string[]> = {
+  project:      ['astarter', 'depin', 'web4', 'abox', 'core agent', 'architecture', 'use case', 'flywheel'],
+  nodes:        ['node', 'pioneer', 'alliance', 'abox', 'slot', 'tier', 'earn', 'revenue'],
+  token:        [' aa ', 'token', 'tokenomics', 'tge', 'supply', 'vesting', 'emission', 'airdrop', 'allocation'],
+  mulan:        ['mulan', 'point', 'nft', 'star', 'referral', 'bnb', 'redeem'],
+  partnerships: ['partner', 'paygo', 'zeus', 'eni', 'eniac', 'zbtc', 'collaboration'],
+  roadmap:      ['roadmap', 'timeline', 'launch', 'mainnet', 'q2', 'q3', '2026', 'phase', 'milestone'],
+  team:         ['team', 'investor', 'okx', 'emurgo', 'advisor', 'founder', 'backed'],
+  developers:   ['developer', 'sdk', 'api', 'framework', 'build', 'grant'],
+  links:        ['link', 'website', 'telegram', 'twitter', 'discord', 'medium', 'gitbook', 'social'],
+};
+
+const NEGATIVE_SIGNALS = [
+  'angry', 'frustrated', 'terrible', 'awful', 'ridiculous', 'scam', 'fraud',
+  'useless', 'worst', 'hate', 'stupid', 'disgusting', 'horrible', 'broken',
+  'pathetic', 'waste', 'worthless', 'disaster', 'rubbish', 'trash',
+];
+
 // Allowed URLs — the only links the bot is permitted to output
 const ALLOWED_URLS = new Set([
   // Astarter official channels
@@ -791,6 +809,19 @@ ${faqBlock
     const RAG_PREAMBLE = /^(do you know|can you tell me|can you explain|what (is|are|was|were)|who (is|are|was)|where (is|are)|when (is|are|was)|how (do|does|did|can|should|is)|tell me about|i (want|need) to know|i have a question about|please (explain|tell me|describe)|any (info|information|details|update|news) (on|about|regarding)|is (there|it)|are there|have you heard|do you have)\s+/i;
     const topicQuery = cleanCurrent.replace(RAG_PREAMBLE, '').trim() || cleanCurrent;
 
+    // Intent + sentiment — free keyword-based detection, no extra API call
+    const intent = this.detectIntent(topicQuery);
+    const sentiment = this.detectSentiment(cleanCurrent);
+    const escalateFromSentiment = await this.trackNegativeSentiment(context.userId, sentiment);
+    if (escalateFromSentiment) {
+      return {
+        content: "I want to make sure you get the right help — let me flag this for a team member who can assist you further! 🙌",
+        model: this.config.defaultModel,
+        provider: 'aws',
+        isEscalation: true,
+      };
+    }
+
     // For follow-up questions, enrich the RAG query with the last assistant reply
     // so short follow-ups like "what about fees?" find the right context
     const lastAssistant = context.messages
@@ -823,7 +854,7 @@ ${faqBlock
 
         // Pass 1: current project knowledge
         const deckRaw = await this.vectorStore.searchFiltered(ragQuery, 5, ['astarter_deck', 'manual']);
-        let deckHits = deckRaw.filter(h => h.score >= MIN_SCORE);
+        let deckHits = this.boostChunksByIntent(deckRaw.filter(h => h.score >= MIN_SCORE), intent);
 
         // Debug: always log top scores so PM2 logs show what was found/filtered
         if (deckRaw.length > 0) {
@@ -1249,6 +1280,47 @@ ${faqBlock
 
   async setUserLang(userId: string, lang: string): Promise<void> {
     try { await this.redis.setex(`ai:user_lang:${userId}`, 30 * 24 * 3600, lang); } catch {}
+  }
+
+  // ── Intent / sentiment helpers ────────────────────────────────────────────────
+  private detectIntent(message: string): string {
+    const lower = message.toLowerCase();
+    for (const [intent, keywords] of Object.entries(INTENT_KEYWORDS)) {
+      if (keywords.some(kw => lower.includes(kw))) return intent;
+    }
+    return 'general';
+  }
+
+  private detectSentiment(message: string): 'positive' | 'neutral' | 'negative' {
+    const lower = message.toLowerCase();
+    return NEGATIVE_SIGNALS.some(w => lower.includes(w)) ? 'negative' : 'neutral';
+  }
+
+  private boostChunksByIntent(
+    chunks: { pageContent: string; metadata: any; score: number }[],
+    intent: string,
+  ): { pageContent: string; metadata: any; score: number }[] {
+    const keywords = INTENT_KEYWORDS[intent];
+    if (!keywords?.length) return chunks;
+    return chunks
+      .map(c => ({
+        ...c,
+        score: keywords.some(kw => c.pageContent.toLowerCase().includes(kw))
+          ? Math.min(c.score * 1.15, 1.0)
+          : c.score,
+      }))
+      .sort((a, b) => b.score - a.score);
+  }
+
+  private async trackNegativeSentiment(userId: string, sentiment: string): Promise<boolean> {
+    const key = `ai:neg_count:${userId}`;
+    if (sentiment === 'negative') {
+      const count = await this.redis.incr(key);
+      await this.redis.expire(key, 3600);
+      return count >= 2;
+    }
+    await this.redis.del(key).catch(() => {});
+    return false;
   }
 
   // ── Conversation history compression ─────────────────────────────────────────
