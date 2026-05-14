@@ -334,19 +334,21 @@ export default (bot: Bot<BotContext>) => {
     }
   };
 
-  // ── Helper: check if the calling user is a group admin/creator or bot owner ──
+  // ── Helper: check if user can use /ai ────────────────────────────────────────
+  // Allowed: IDs in ADMIN_IDS env var (bot owner + bot-level admins)
+  //          OR group admins/creators detected via Telegram API
   const isAdminOrOwner = async (ctx: BotContext): Promise<boolean> => {
     const userId = ctx.from?.id;
     if (!userId) return false;
 
-    // Bot owner / super-admin IDs from env (comma-separated Telegram user IDs)
-    const ownerIds = (process.env.ADMIN_IDS || '')
+    // 1. Bot owner + manually added bot admins (from .env ADMIN_IDS)
+    const adminIds = (process.env.ADMIN_IDS || '')
       .split(',')
       .map(id => parseInt(id.trim(), 10))
       .filter(n => !isNaN(n));
-    if (ownerIds.includes(userId)) return true;
+    if (adminIds.includes(userId)) return true;
 
-    // In groups: check Telegram admin status
+    // 2. Group admins/creators — Telegram detects these automatically
     if (ctx.chat?.type !== 'private') {
       try {
         const member = await ctx.getChatMember(userId);
@@ -356,7 +358,6 @@ export default (bot: Bot<BotContext>) => {
       }
     }
 
-    // Private chats: only bot owners (already checked above)
     return false;
   };
 
