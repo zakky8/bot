@@ -3,6 +3,16 @@ import { BotContext } from '../../types';
 import { aiService } from '../../core/ai';
 import { isOwner, denyAccess } from '../../utils/permissions';
 import axios from 'axios';
+
+const LANGGRAPH_URL = process.env.LANGGRAPH_SERVICE_URL || 'http://127.0.0.1:8001';
+
+async function notifyLangGraphReload(): Promise<void> {
+  try {
+    await axios.post(`${LANGGRAPH_URL}/reload`, {}, { timeout: 5000 });
+  } catch {
+    // Non-critical — Python service may not be running yet
+  }
+}
 import * as cheerio from 'cheerio';
 
 // pdf-parse v2 class-based API (NOT the old v1 function call)
@@ -160,6 +170,7 @@ export default (bot: Bot<BotContext>) => {
 
         await ctx.reply(`⚙️ Indexing ${content.length.toLocaleString()} characters…`);
         await aiService.addDocument(content, { source: fileName, type: 'manual', ext });
+        notifyLangGraphReload();
         return ctx.reply(`✅ <b>${fileName}</b> indexed successfully! (${content.length.toLocaleString()} chars)`, {
           parse_mode: 'HTML',
         });
@@ -205,6 +216,7 @@ export default (bot: Bot<BotContext>) => {
           date: new Date().toISOString(),
           added_by: ctx.from?.id,
         });
+        notifyLangGraphReload();
         return ctx.reply(
           `✅ URL indexed! (<b>${content.length.toLocaleString()}</b> chars)\n<code>${inputText.slice(0, 80)}</code>`,
           { parse_mode: 'HTML' }
@@ -229,6 +241,7 @@ export default (bot: Bot<BotContext>) => {
         date: new Date().toISOString(),
         added_by: ctx.from?.id,
       });
+      notifyLangGraphReload();
       return ctx.reply(`✅ Text indexed! (${inputText.length.toLocaleString()} chars)`);
     } catch (err: any) {
       console.error('[adddoc text]', err);
@@ -295,6 +308,7 @@ export default (bot: Bot<BotContext>) => {
   bot.command('updatedocs', async (ctx: BotContext) => {
     if (!isOwner(ctx)) return denyAccess(ctx, true);
     aiService.reloadFaq();
+    notifyLangGraphReload(); // sync FAQ to Python service too
     return ctx.reply('✅ FAQ reloaded and reindexed.');
   });
 
