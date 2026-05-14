@@ -15,8 +15,9 @@ module.exports = {
     },
     {
       name: 'langgraph-service',
-      script: `${process.env.HOME}/bot/langgraph-service/venv/bin/uvicorn`,
-      args: 'main:app --host 127.0.0.1 --port 8001 --workers 2',
+      script: `${process.env.HOME}/bot/langgraph-service/venv/bin/python3`,
+      args: '-m uvicorn main:app --host 127.0.0.1 --port 8001 --workers 2',
+      interpreter: 'none',
       cwd: `${process.env.HOME}/bot/langgraph-service`,
       instances: 1,
       autorestart: true,
