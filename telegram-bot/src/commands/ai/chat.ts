@@ -335,29 +335,31 @@ export default (bot: Bot<BotContext>) => {
   };
 
   // ── Helper: check if user can use /ai ────────────────────────────────────────
-  // Private/DM: always allowed (only the user and bot are present)
-  // Groups: must be in ADMIN_IDS env var OR be a group admin/creator
+  // DM: only ADMIN_IDS (bot owner + bot-level admins)
+  // Groups: ADMIN_IDS OR group admin/creator via Telegram API
   const isAdminOrOwner = async (ctx: BotContext): Promise<boolean> => {
     const userId = ctx.from?.id;
     if (!userId) return false;
 
-    // DM — no restriction needed
-    if (ctx.chat?.type === 'private') return true;
-
-    // Groups: check ADMIN_IDS env var first (bot owner + bot-level admins)
-    const adminIds = (process.env.ADMIN_IDS || '')
-      .split(',')
-      .map(id => parseInt(id.trim(), 10))
-      .filter(n => !isNaN(n));
+    // Bot owner + bot-level admins — read from OWNER_ID and ADMIN_IDS env vars
+    const rawIds = [
+      ...(process.env.OWNER_ID || '').split(','),
+      ...(process.env.ADMIN_IDS || '').split(','),
+    ];
+    const adminIds = rawIds.map(id => parseInt(id.trim(), 10)).filter(n => !isNaN(n));
     if (adminIds.includes(userId)) return true;
 
-    // Groups: fall back to Telegram admin status
-    try {
-      const member = await ctx.getChatMember(userId);
-      return ['creator', 'administrator'].includes(member.status);
-    } catch {
-      return false;
+    // Groups only: also allow Telegram group admins/creators
+    if (ctx.chat?.type !== 'private') {
+      try {
+        const member = await ctx.getChatMember(userId);
+        return ['creator', 'administrator'].includes(member.status);
+      } catch {
+        return false;
+      }
     }
+
+    return false;
   };
 
   // ── /ask — public question command (typed text only) ─────────────────────────
