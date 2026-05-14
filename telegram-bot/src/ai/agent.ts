@@ -146,11 +146,17 @@ type S = typeof AgentState.State;
 async function classify(state: S): Promise<Partial<S>> {
   const intents = ['project','nodes','token','mulan','partnerships','roadmap','team','developers','links','general'];
   try {
-    const raw = await aiService.quickChat(
-      'You are a classifier. Reply ONLY with valid JSON — no markdown, no explanation.',
-      `Message: "${state.message.slice(0, 200)}"\nReply with: {"intent":"${intents.join('|')}","sentiment":"positive|neutral|negative"}`,
-      128,
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('classify timeout')), 10000)
     );
+    const raw = await Promise.race([
+      aiService.quickChat(
+        'You are a classifier. Reply ONLY with valid JSON — no markdown, no explanation.',
+        `Message: "${state.message.slice(0, 200)}"\nReply with: {"intent":"${intents.join('|')}","sentiment":"positive|neutral|negative"}`,
+        128,
+      ),
+      timeout,
+    ]);
     const cleaned = raw.replace(/```[\s\S]*?```/g, '').trim();
     const data = JSON.parse(cleaned);
     const intent    = intents.includes(data.intent)      ? data.intent    : 'general';
@@ -207,7 +213,10 @@ async function generate(state: S): Promise<Partial<S>> {
 
   let response: string;
   try {
-    response = await aiService.quickChat(system, userPrompt, 1024);
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('generate timeout')), 28000)
+    );
+    response = await Promise.race([aiService.quickChat(system, userPrompt, 1024), timeout]);
   } catch {
     response = `I'm having trouble right now. Please check ${ANN} for the latest updates.`;
   }

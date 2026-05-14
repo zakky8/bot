@@ -269,6 +269,7 @@ export class AIService {
             accessKeyId:     this.config.awsAccessKey,
             secretAccessKey: this.config.awsSecretKey,
           },
+          requestHandler: { requestTimeout: 25000 }, // 25 s hard cap per request
         });
         this.logger.info(`AWS Bedrock Runtime initialised (${this.config.awsRegion})`);
       } catch (err) {
