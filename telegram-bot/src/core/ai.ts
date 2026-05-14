@@ -20,8 +20,8 @@ function createAIService() {
         anthropicApiKey:  process.env.AI_API_KEY                || '',
         awsAccessKey:     process.env.AWS_ACCESS_KEY            || '',
         awsSecretKey:     process.env.AWS_SECRET_KEY            || '',
-        awsRegion:        process.env.AWS_REGION                || 'ap-south-1',
-        defaultModel:     process.env.AI_MODEL                  || 'anthropic.claude-3-haiku-20240307-v1:0',
+        awsRegion:        process.env.AWS_REGION                || 'eu-north-1',
+        defaultModel:     process.env.AI_MODEL                  || 'openai.gpt-oss-120b-1:0',
         botName:          process.env.BOT_NAME                  || 'TENET',
         escalationUserId: process.env.HUMAN_MODERATOR_CHAT_ID  || '',
     }, redisClient, logger);
