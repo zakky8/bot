@@ -32,11 +32,11 @@ def _build_with_postgres():
         return None
 
 def _build_with_redis():
-    from langgraph.checkpoint.redis import RedisSaver
     redis_url = os.environ.get("REDIS_URL", "")
     if not redis_url:
         return None
     try:
+        from langgraph.checkpoint.redis import RedisSaver
         checkpointer = RedisSaver.from_conn_string(redis_url)
         checkpointer.setup()
         print("[main] Using Redis checkpointer")
