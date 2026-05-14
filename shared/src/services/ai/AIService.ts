@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { BedrockRuntimeClient, ConverseCommand, ConverseStreamCommand } from '@aws-sdk/client-bedrock-runtime';
+import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { Redis } from 'ioredis';
 import { Logger } from 'winston';
 import * as fs from 'fs';
@@ -269,7 +270,7 @@ export class AIService {
             accessKeyId:     this.config.awsAccessKey,
             secretAccessKey: this.config.awsSecretKey,
           },
-          requestHandler: { requestTimeout: 25000 }, // 25 s hard cap per request
+          requestHandler: new NodeHttpHandler({ requestTimeout: 20000, connectionTimeout: 5000 }),
         });
         this.logger.info(`AWS Bedrock Runtime initialised (${this.config.awsRegion})`);
       } catch (err) {
@@ -748,7 +749,7 @@ ${faqBlock
       'InternalServerException',
       'ModelTimeoutException',
     ]);
-    const MAX_ATTEMPTS = 4;
+    const MAX_ATTEMPTS = 2;
     let lastErr: any;
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
