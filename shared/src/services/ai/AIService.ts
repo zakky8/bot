@@ -544,9 +544,10 @@ ${faqBlock
   private async checkRateLimit(userId: string): Promise<boolean> {
     const key = `ai:ratelimit:${userId}`;
     const current = await this.redis.get(key);
+    const ttl = Math.floor(this.config.rateLimit.windowMs / 1000);
 
     if (!current) {
-      await this.redis.setex(key, Math.floor(this.config.rateLimit.windowMs / 1000), '1');
+      await this.redis.setex(key, ttl, '1');
       return true;
     }
 
@@ -554,6 +555,7 @@ ${faqBlock
     if (count >= this.config.rateLimit.maxRequests) return false;
 
     await this.redis.incr(key);
+    await this.redis.expire(key, ttl); // reset window on each request to prevent shrinkage
     return true;
   }
 
@@ -563,7 +565,7 @@ ${faqBlock
     chatId?: string,
     platform: 'discord' | 'telegram' = 'discord',
   ): Promise<ConversationContext> {
-    const key = `ai:conversation:${platform}:${chatId ?? userId}:${userId}`;
+    const key = `ai:conversation:${platform}:chat:${chatId ?? userId}:user:${userId}`;
     const raw = await this.redis.get(key);
 
     if (raw) {
@@ -578,7 +580,7 @@ ${faqBlock
   }
 
   async saveConversationContext(context: ConversationContext, ttl = 3600): Promise<void> {
-    const key = `ai:conversation:${context.platform}:${context.chatId ?? context.userId}:${context.userId}`;
+    const key = `ai:conversation:${context.platform}:chat:${context.chatId ?? context.userId}:user:${context.userId}`;
     // Keep last 20 messages (10 turns) to cap memory usage
     const trimmed = { ...context, messages: context.messages.slice(-20) };
     await this.redis.setex(key, ttl, JSON.stringify(trimmed));
@@ -589,7 +591,7 @@ ${faqBlock
     chatId?: string,
     platform: 'discord' | 'telegram' = 'discord',
   ): Promise<void> {
-    const key = `ai:conversation:${platform}:${chatId ?? userId}:${userId}`;
+    const key = `ai:conversation:${platform}:chat:${chatId ?? userId}:user:${userId}`;
     await this.redis.del(key);
   }
 
@@ -970,10 +972,8 @@ ${faqBlock
       response.content = "I don't have that link confirmed right now — you can find all official Astarter links at https://linktr.ee/Astarter 🔗";
     }
 
-    // 8. Handle escalation signal — strip Markdown bold/italic wrappers before checking
-    //    (AI sometimes outputs **ESCALATE** instead of bare ESCALATE)
-    const escalateCandidate = response.content.trim().replace(/^\*{1,2}(.*?)\*{1,2}$/, '$1').trim();
-    if (/^ESCALATE[.!]?\s*$/i.test(escalateCandidate)) {
+    // 8. Handle escalation signal — match ESCALATE as the entire response (with optional markup)
+    if (/^\*{0,2}ESCALATE\*{0,2}[.!]?\s*$/i.test(response.content.trim())) {
       response.isEscalation = true;
       response.content =
         "I want to make sure you get the right help — let me flag this for a team member who can assist you further! 🙌";
@@ -1284,7 +1284,8 @@ ${faqBlock
 
   // ── Intent / sentiment helpers ────────────────────────────────────────────────
   private detectIntent(message: string): string {
-    const lower = message.toLowerCase();
+    // Pad with spaces so space-padded keywords like ' aa ' match word boundaries
+    const lower = ' ' + message.toLowerCase() + ' ';
     for (const [intent, keywords] of Object.entries(INTENT_KEYWORDS)) {
       if (keywords.some(kw => lower.includes(kw))) return intent;
     }
