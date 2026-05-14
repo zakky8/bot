@@ -20,7 +20,7 @@ const LINK_LOOKUP: Array<{ keywords: string[]; url: string; label: string }> = [
   { keywords: ['gitbook', 'docs', 'documentation', 'whitepaper', 'guide', 'wiki', 'manual'],
     url: 'https://astarter.gitbook.io/astarter', label: 'Gitbook / Docs' },
   { keywords: ['website', 'homepage', 'web site', 'official site'],
-    url: 'https://www.astarter.io', label: 'Website' },
+    url: 'https://app.astarter.io', label: 'Website' },
   { keywords: ['discord'],
     url: 'https://discord.gg/XXDEjFPrgR', label: 'Discord' },
   { keywords: ['announcement', 'announce', 'ann channel', 'news channel'],
