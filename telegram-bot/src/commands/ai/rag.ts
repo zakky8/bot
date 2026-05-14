@@ -1,7 +1,7 @@
 import { Bot } from 'grammy';
 import { BotContext } from '../../types';
 import { aiService } from '../../core/ai';
-import { isOwner, denyAccess } from '../../utils/permissions';
+import { isOwner, isBotAdmin, denyAccess } from '../../utils/permissions';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 
@@ -104,7 +104,7 @@ async function scrapeUrl(url: string): Promise<string> {
 export default (bot: Bot<BotContext>) => {
   // ── /aion  /aioff ──────────────────────────────────────────────────────────
   bot.command(['aion', 'aioff'], async (ctx: BotContext) => {
-    if (!isOwner(ctx)) return denyAccess(ctx, true);
+    if (!isBotAdmin(ctx)) return denyAccess(ctx, true);
     const enabled = ctx.message?.text?.includes('aion');
     ctx.session.aiEnabled = enabled;
     return ctx.reply(`🤖 AI is now ${enabled ? '✅ ENABLED' : '❌ DISABLED'} for this chat.`);
