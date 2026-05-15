@@ -38,6 +38,8 @@ const ALLOWED_URLS = new Set([
   'https://x.com/ENI__Official',
   'https://t.me/ENI_Channel',
   'https://t.me/ENI_Community',
+  'https://x.com/UXLINKofficial',
+  'https://uxlink.io',
   'contact@astarter.io',
 ]);
 
@@ -87,14 +89,15 @@ STRICT RULES:
   partnerships: `You are TENET, Astarter's AI assistant — expert on Astarter partnerships.
 
 KNOWLEDGE (use selectively):
-4 active partners: MULAN Labs (May 2026) · PayGo (April 2026) · Zeus Network (April 2026) · ENI/ENIAC (April 2026).
-MULAN Labs: community rewards/referral platform, MULAN point holders get AA airdrop + fee sharing. https://mulan.meme
-PayGo: AI-native x402 payment protocol — AI agents pay each other autonomously. https://www.paygo.ac
-Zeus Network: Bitcoin liquidity via zBTC (1:1 BTC-pegged) into Astarter ecosystem. https://zeusnetwork.xyz
-ENI/ENIAC: enterprise modular L1 blockchain, cross-chain DeFi + co-incubation. https://eniac.network
+5 active partners: MULAN Labs · PayGo · Zeus Network · ENI/ENIAC · UXLINK.
+MULAN Labs (May 2026): community rewards/referral platform, MULAN point holders get AA airdrop + fee sharing. https://mulan.meme
+PayGo (April 2026): AI-native x402 payment protocol — AI agents pay each other autonomously. https://www.paygo.ac
+Zeus Network (April 2026): Bitcoin liquidity via zBTC (1:1 BTC-pegged) into Astarter ecosystem. https://zeusnetwork.xyz
+ENI/ENIAC (April 2026): enterprise modular L1 blockchain, cross-chain DeFi + co-incubation. https://eniac.network
+UXLINK (May 2026): leading Web3 social platform — social growth layer connecting global users, communities and builders. Partnership goal: integrate Astarter's AI-native infrastructure with UXLINK's social ecosystem to accelerate Web3 participation, autonomous coordination and on-chain growth. https://x.com/UXLINKofficial
 
 BEHAVIOUR:
-• Vague question ("partners", "partnerships") → "Astarter has 4 active partners: MULAN Labs, PayGo, Zeus Network, and ENI/ENIAC." Ask which one they want details on.
+• Vague question ("partners", "partnerships") → "Astarter has 5 active partners: MULAN Labs, PayGo, Zeus Network, ENI/ENIAC, and UXLINK." Ask which one they want details on.
 • Named a specific partner → give that partner's details only (1–2 sentences max).
 • Only state confirmed partnerships. Never speculate.`,
 
@@ -172,7 +175,8 @@ const BASE_RULES = `
 RULES (highest priority — override everything):
 1. SPECIFICITY: Answer ONLY what was asked. One focused answer per message. Never volunteer extra topics or sections.
 2. VAGUE QUESTIONS: If the message has no specific angle (e.g. "mulan", "nodes", "tell me about X") — give ONE sentence overview and ask which specific aspect they want. NEVER dump a full data sheet.
-3. CONVERSATIONAL: Write like a knowledgeable human, not a data sheet. No bullet for a single fact — just say it as a sentence. Bullets only when listing 3 or more parallel items.
+3. AMBIGUOUS QUESTIONS: If the question uses "it", "this", "they", "the project", or a generic term without making the topic clear — do NOT guess. Ask for clarification first. Example: "how does it work?" → "What are you asking about — ABox nodes, MULAN points, the AA token, or something else?"
+4. CONVERSATIONAL: Write like a knowledgeable human, not a data sheet. No bullet for a single fact — just say it as a sentence. Bullets only when listing 3 or more parallel items.
 4. DIRECT: Lead with the answer immediately. No preamble, no "Great question!", no restating the question.
 6. CONCISE: Max 120 words. Shorter is better. User can always ask for more.
 7. BULLETS: Use • only. NEVER use dashes (–, -, —) as list markers. Flat list only, max 4 bullets.
@@ -208,7 +212,7 @@ const INTENT_KEYWORDS: Record<string, string[]> = {
   nodes:        ['node','abox','lite tier','pro tier','max tier','a-core','slot count','compute node','hardware node','buy node','node price','node cost'],
   mulan:        ['mulan','mulan point','nft star','redemption','redeem','convert point'],
   token:        ['aa token','token supply','emission','tge','vesting','allocation','token price','listing','airdrop'],
-  partnerships: ['partner','paygo','zeus network','eni','eniac','mulan labs','zbtc','bitcoin','x402'],
+  partnerships: ['partner','paygo','zeus network','eni','eniac','mulan labs','zbtc','bitcoin','x402','uxlink'],
   roadmap:      ['roadmap','q1 2026','q2 2026','q3 2026','q4 2026','2025','2027','mainnet','tge date','timeline','when launch','when mainnet','when tge'],
   team:         ['team','founder','investor','okx ventures','emurgo','advisor','backing','backer','who made','who built','who is behind'],
   developers:   ['developer','dev tool','sdk','api','framework','build on','grant program','open source','langchain'],
