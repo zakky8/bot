@@ -343,7 +343,10 @@ export default (bot: Bot<BotContext>) => {
       const followUp = FOLLOWUPS[result.intent];
       const alreadyHasQuestion = /\?\s*(<\/[a-z]+>)?\s*$/.test(text.trim());
       const hasChannelRefFinal  = text.includes('announcements channel') || text.includes(ANN_URL);
-      if (followUp && !alreadyHasQuestion && !hasChannelRefFinal && result.intent !== 'links') {
+      // Suppress follow-up when bot directed user to Discord ticket — that IS the answer,
+      // no need to append "Want details on any specific partner?" after it.
+      const hasDiscordTicket    = text.includes('discord.gg') && text.toLowerCase().includes('ticket');
+      if (followUp && !alreadyHasQuestion && !hasChannelRefFinal && !hasDiscordTicket && result.intent !== 'links') {
         text = text.trimEnd() + '\n\n' + followUp;
       }
 
