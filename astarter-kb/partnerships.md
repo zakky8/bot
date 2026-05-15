@@ -42,7 +42,7 @@ Astarter has 5 active partnerships. Add new ones below when announced.
 - **Announced:** May 2026
 - **What they do:** Leading Web3 social platform — connects global users, communities, and builders to accelerate Web3 participation.
 - **Integration with Astarter:** Astarter's AI-native infrastructure integrates with UXLINK's social ecosystem to enable autonomous coordination, social growth, and on-chain activity at scale.
-- **Links:** https://x.com/UXLINKofficial | https://uxlink.io
+- **Links:** https://x.com/UXLINKofficial | https://uxlink.io | https://linktr.ee/uxlink_official
 
 ---
 

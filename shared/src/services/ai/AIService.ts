@@ -204,6 +204,7 @@ const ALLOWED_URLS = new Set([
   // Partner links — UXLINK
   'https://x.com/UXLINKofficial',
   'https://uxlink.io',
+  'https://linktr.ee/uxlink_official',
 ]);
 
 
