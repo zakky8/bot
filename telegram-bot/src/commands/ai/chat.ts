@@ -324,6 +324,29 @@ export default (bot: Bot<BotContext>) => {
       if (isGroup) text = text.replace(/^@[\w]+\s*\n/, '');
       if (mentionPrefix) text = `${mentionPrefix}\n${text}`;
 
+      // ── Deterministic follow-up injection ────────────────────────────────────
+      // The model is unreliable about adding follow-up questions, so we do it in
+      // code: if the response doesn't already end with a question, append one
+      // based on the intent. Skip for links (no follow-up needed), escalations
+      // (handled above), and dead-end "not confirmed" answers (channel ref added).
+      const FOLLOWUPS: Record<string, string> = {
+        nodes:        'Want to know about pricing, earning, or how to get started?',
+        token:        'Want details on the supply, allocation breakdown, or TGE timeline?',
+        mulan:        'Want to know how to earn points, NFT tiers, or redemption?',
+        partnerships: 'Want details on any specific partner?',
+        roadmap:      'Want to know what\'s already done, what\'s coming next, or a specific milestone?',
+        team:         'Want to know more about the investors, advisors, or legitimacy?',
+        developers:   'Want info on the framework, the API, or the grant program?',
+        project:      'Want to dig into nodes, the AA token, or the AI agent ecosystem?',
+        general:      'Anything else I can help with?',
+      };
+      const followUp = FOLLOWUPS[result.intent];
+      const alreadyHasQuestion = /\?\s*(<\/[a-z]+>)?\s*$/.test(text.trim());
+      const hasChannelRefFinal  = text.includes('announcements channel') || text.includes(ANN_URL);
+      if (followUp && !alreadyHasQuestion && !hasChannelRefFinal && result.intent !== 'links') {
+        text = text.trimEnd() + '\n\n' + followUp;
+      }
+
       if (text.length > 4000) {
         // Too long for one message — delete status and send as chunks
         await ctx.api.deleteMessage(ctx.chat!.id, statusMsgId).catch(() => {});
