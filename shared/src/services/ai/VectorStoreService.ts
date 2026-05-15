@@ -1,4 +1,5 @@
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
+import { NodeHttpHandler } from '@smithy/node-http-handler';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -26,6 +27,8 @@ export class VectorStoreService {
                 accessKeyId: config.accessKeyId,
                 secretAccessKey: config.secretAccessKey,
             },
+            // Abort embedding calls that hang — prevents retrieve node from blocking >8s
+            requestHandler: new NodeHttpHandler({ requestTimeout: 7000, connectionTimeout: 4000 }),
         });
         this.storagePath = path.join(storagePath, 'vector_db.json');
     }

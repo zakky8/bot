@@ -150,6 +150,15 @@ function formatForTelegram(raw: string): string {
     return ''; // strip everything else
   });
 
+  // 5b. Escape any bare < that are NOT part of a valid Telegram HTML tag.
+  //     After step 5, only supported Telegram tags remain. Any remaining < (e.g.
+  //     "price < $500", "<custom>", math comparisons) would break Telegram's HTML
+  //     parser with a 400 "can't parse entities" error. Escape them to &lt;.
+  text = text.replace(
+    /<(?!\/?(?:b|i|u|s|ins|del|strike|em|strong|code|pre|tg-spoiler|blockquote)\b|a[\s>]|\/a>)/gi,
+    '&lt;'
+  );
+
   // 6. Flatten nested dashes/hyphens → bullet (• )
   // Catches lines like "  – item", "  - item", "   — item" regardless of indent depth
   text = text.replace(/^[ \t]*[–—-][ \t]+/gm, '• ');
@@ -157,6 +166,18 @@ function formatForTelegram(raw: string): string {
   // 7. Collapse 3+ newlines → 2
   text = text.replace(/\n{3,}/g, '\n\n').trim();
   return text;
+}
+
+/** Strip all HTML tags for a plain-text fallback when Telegram rejects the HTML */
+function stripHtmlTags(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
+    .trim();
 }
 
 // ── Layer 4: Output guard — identity confessions + wrong links ────────────────
@@ -324,7 +345,13 @@ export default (bot: Bot<BotContext>) => {
         }).catch(() => null);
 
         if (!edited) {
-          await ctx.reply(text, { parse_mode: 'HTML' }).catch(() => {});
+          // HTML parse failed (e.g. bare < in response) — delete status and resend as plain text
+          await ctx.api.deleteMessage(ctx.chat!.id, statusMsgId).catch(() => {});
+          const plain = stripHtmlTags(text);
+          await ctx.reply(plain || text, replyOpts).catch(async () => {
+            // Absolute last resort — send with no parse_mode
+            await ctx.reply(plain || '❓ Something went wrong formatting the response. Please try again.').catch(() => {});
+          });
         }
       }
 
