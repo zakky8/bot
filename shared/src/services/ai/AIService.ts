@@ -106,10 +106,10 @@ const MAX_INPUT_LENGTH = 1000;
 
 const INTENT_KEYWORDS: Record<string, string[]> = {
   project:      ['astarter', 'depin', 'web4', 'abox', 'core agent', 'architecture', 'use case', 'flywheel'],
-  nodes:        ['node', 'pioneer', 'alliance', 'abox', 'slot', 'tier', 'earn', 'revenue'],
+  nodes:        ['node', 'lite tier', 'pro tier', 'max tier', 'abox', 'slot', 'compute node', 'hardware node'],
   token:        [' aa ', 'token', 'tokenomics', 'tge', 'supply', 'vesting', 'emission', 'airdrop', 'allocation'],
   mulan:        ['mulan', 'point', 'nft', 'star', 'referral', 'bnb', 'redeem'],
-  partnerships: ['partner', 'paygo', 'zeus', 'eni', 'eniac', 'zbtc', 'collaboration'],
+  partnerships: ['partner', 'paygo', 'zeus', 'eni', 'eniac', 'zbtc', 'collaboration', 'uxlink', 'mulan labs'],
   roadmap:      ['roadmap', 'timeline', 'launch', 'mainnet', 'q2', 'q3', '2026', 'phase', 'milestone'],
   team:         ['team', 'investor', 'okx', 'emurgo', 'advisor', 'founder', 'backed'],
   developers:   ['developer', 'sdk', 'api', 'framework', 'build', 'grant'],
