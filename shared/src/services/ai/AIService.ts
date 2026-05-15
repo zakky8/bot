@@ -119,7 +119,7 @@ const INTENT_KEYWORDS: Record<string, string[]> = {
 // Intent-specific expert knowledge blocks injected into the dynamic prompt (Node 5 equivalent)
 const INTENT_EXPERT_BLOCKS: Record<string, string> = {
   nodes: `## ABox Node Expert Knowledge
-Node tiers — Pioneer ($500 | 10,500 AA | 1,142 slots) · Alliance ($1,000 | 2,900 AA | 4,137 slots) · Community ($3,000 | 1,333 AA | 12,000 slots). Total: 17,279 slots.
+Node tiers — LITE ($500 | 1,333 AA | 12,000 slots) · PRO ($1,000 | 2,900 AA | 4,137 slots) · MAX ($3,000 | 10,500 AA | 1,142 slots). Total: 17,279 slots. All tiers include revenue sharing + ABox presale whitelist.
 Earning: 10% USDT direct referral per invite · 10% Global Board Revenue (NFT mining + DPOS + ecosystem) · 20% of new nodes' daily funds by weight to all holders.
 Revenue streams: AI execution fees, compute rewards, marketplace share, DEX fee share, prediction market fees. Earning begins at mainnet (Q2–Q3 2026).
 Be honest about risks: TGE not confirmed, tokens not liquid yet.`,
@@ -138,10 +138,12 @@ CRITICAL: The 30% is the size of the token POOL reserved for MULAN holders — N
 Node Revenue Tiers: $100→10% · $500→25% · $1,000→50% trading fee revenue share. Senior Partner: $3,000 → top-level partner + MULAN node worth $1,000.`,
 
   partnerships: `## Partnerships Expert Knowledge
+5 active partners: MULAN Labs · PayGo · Zeus Network · ENI/ENIAC · UXLINK.
 MULAN Labs (May 2026): Referral/traffic platform. MULAN point holders get AA airdrops + NFT rewards + node fee sharing. https://mulan.meme
 PayGo (April 2026): AI-native x402 payment protocol — AI agents pay each other autonomously. https://www.paygo.ac
 Zeus Network (April 2026): Bitcoin liquidity via zBTC (1:1 BTC-pegged), cross-chain BTC into Astarter. https://zeusnetwork.xyz
-ENI/ENIAC Network (April 2026): Enterprise modular L1, cross-chain DeFi + co-incubation. https://eniac.network`,
+ENI/ENIAC Network (April 2026): Enterprise modular L1, cross-chain DeFi + co-incubation. https://eniac.network
+UXLINK (May 2026): Leading Web3 social platform — connects global users, communities and builders. Partnership goal: integrate Astarter's AI-native infrastructure with UXLINK's social ecosystem to accelerate Web3 participation, autonomous coordination and on-chain growth. https://x.com/UXLINKofficial`,
 
   roadmap: `## Roadmap Expert Knowledge
 2025 Q3–Q4 (COMPLETE): ABox presale, testnet, AI Agents early access.
@@ -159,7 +161,7 @@ Advisors: Sergio Sanchez (Head of Product EMURGO/Yoroi) · John O'Connor (Direct
 AI Agents Framework: Open-source, compatible with LangChain/AutoGPT. LIVE at mainnet.
 Developer API/Docs: Full integration docs — coming Q2–Q3 2026 at mainnet.
 Astarter Grant Program: Ecosystem grants for AI agent builders — expected Q2–Q3 2026.
-Developer community: Discord #developers https://discord.gg/XXDEjFPrgR · Enquiries: contact@astarter.io`,
+Developer community: Discord #developers https://discord.gg/XXDEjFPrgR`,
 };
 
 const NEGATIVE_SIGNALS = [
@@ -171,7 +173,7 @@ const NEGATIVE_SIGNALS = [
 // Allowed URLs — the only links the bot is permitted to output
 const ALLOWED_URLS = new Set([
   // Astarter official channels
-  'https://www.astarter.io',
+  'https://app.astarter.io',
   'https://astarter.gitbook.io',
   'https://t.me/AstarterDefiHubOfficial',
   'https://t.me/Astarteranncmnt',
@@ -199,6 +201,9 @@ const ALLOWED_URLS = new Set([
   'https://x.com/ENI__Official',
   'https://t.me/ENI_Channel',
   'https://t.me/ENI_Community',
+  // Partner links — UXLINK
+  'https://x.com/UXLINKofficial',
+  'https://uxlink.io',
 ]);
 
 
@@ -398,7 +403,7 @@ These are questions users ask constantly where the answer does NOT exist in the 
 | Which exchanges will list AA | "Not confirmed yet — watch the announcements channel when it's announced." |
 | Node daily/monthly earnings (exact $) | "Earnings depend on network activity — exact amounts aren't published yet." |
 | Staking APY / yield % | "No APY figure has been officially confirmed." |
-| How to buy/purchase a node (step-by-step) | "For purchase details, visit www.astarter.io or ask in the community." |
+| How to buy/purchase a node (step-by-step) | "For purchase details, visit app.astarter.io or ask in the community." |
 | Founder / CEO / team identity | "The team hasn't been publicly disclosed." |
 | KYC requirements | "Not confirmed in my knowledge base — check official channels." |
 | When airdrop tokens will arrive | "Airdrop distribution timing hasn't been officially confirmed." |
@@ -492,7 +497,7 @@ If a user is clearly angry, repeatedly frustrated, or explicitly asks for a huma
 When a user asks for a specific link, give EXACTLY the URL below for that topic. Never substitute one URL for another.
 
 • gitbook / docs / documentation / guide → https://astarter.gitbook.io/astarter
-• website / homepage → https://www.astarter.io
+• website / homepage → https://app.astarter.io
 • telegram community / tg group / community chat → https://t.me/AstarterDefiHubOfficial
 • announcements / ann channel → https://t.me/Astarteranncmnt
 • twitter / x → https://x.com/AstarterDefiHub
@@ -509,6 +514,7 @@ Partner links (ONLY when user explicitly asks for a partner's link):
 • Zeus Network → https://zeusnetwork.xyz
 • ENI / ENIAC → https://eniac.network
 • MULAN / Mulan Labs → https://mulan.meme
+• UXLINK → https://x.com/UXLINKofficial
 
 Link rules:
 • Share a link ONLY when the user explicitly asks for it ("give me the link", "what's the URL", "where can I find it").
