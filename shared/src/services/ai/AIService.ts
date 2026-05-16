@@ -774,20 +774,21 @@ ${faqBlock
     let lastErr: any;
 
     // ── Bedrock prompt caching ─────────────────────────────────────────────
-    // Cache the system prompt prefix so repeat calls re-use the computed KV state
-    // instead of re-prefilling. Supported families: anthropic.*, amazon.nova-*,
-    // and OpenAI gpt-oss-* models. We add a cachePoint marker AFTER the system
-    // text — Bedrock caches everything before the marker.
-    // Cuts TTFT ~3× on warm cache and reduces input-token cost ~70%.
-    const cacheable =
+    // Cache the system prompt prefix so repeat calls re-use the computed KV state.
+    // Only enabled for model families we have CONFIRMED support cachePoint on
+    // Bedrock — Anthropic Claude 3.x/4.x and Amazon Nova. OpenAI gpt-oss-* on
+    // Bedrock does NOT currently accept cachePoint and will reject the request.
+    // If a model later adds support, the request will fall back gracefully via
+    // the InvalidRequestException catch below.
+    let cacheable =
       modelToUse.startsWith('anthropic.') ||
-      modelToUse.startsWith('amazon.nova-') ||
-      modelToUse.startsWith('openai.');
+      modelToUse.startsWith('amazon.nova-');
 
-    const systemBlocks: any[] = [{ text: systemPrompt }];
-    if (cacheable) {
-      systemBlocks.push({ cachePoint: { type: 'default' } });
-    }
+    const buildSystemBlocks = (): any[] => {
+      const blocks: any[] = [{ text: systemPrompt }];
+      if (cacheable) blocks.push({ cachePoint: { type: 'default' } });
+      return blocks;
+    };
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
@@ -795,7 +796,7 @@ ${faqBlock
 
         const command = new ConverseCommand({
           modelId: modelToUse,
-          system: systemBlocks,
+          system: buildSystemBlocks(),
           messages: sanitized.map(m => ({
             role: m.role,
             content: [{ text: m.content }]
@@ -833,9 +834,22 @@ ${faqBlock
       } catch (err: any) {
         lastErr = err;
         const code: string = err?.name ?? err?.code ?? err?.errorCode ?? '';
+        const msg: string  = (err?.message ?? '').toLowerCase();
+
+        // ── Cache-point rejection auto-recovery ──────────────────────────────
+        // If the model rejected cachePoint (e.g. OpenAI gpt-oss on Bedrock),
+        // disable caching and retry immediately. Prevents a permanent outage
+        // when AWS adds/removes cachePoint support on specific models.
+        if (cacheable && (msg.includes('cachepoint') || msg.includes('cache point') ||
+            (code === 'ValidationException' && msg.includes('cache')))) {
+          this.logger.warn(`Model ${modelToUse} rejected cachePoint — disabling cache and retrying`);
+          cacheable = false;
+          continue; // immediate retry on same attempt count
+        }
+
         const isRetryable = RETRYABLE.has(code) ||
-            (err?.message ?? '').toLowerCase().includes('throttl') ||
-            (err?.message ?? '').toLowerCase().includes('too many requests');
+            msg.includes('throttl') ||
+            msg.includes('too many requests');
 
         if (isRetryable && attempt < MAX_ATTEMPTS) {
           const delay = Math.pow(2, attempt) * 600; // 1.2s, 2.4s, 4.8s
