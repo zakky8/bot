@@ -175,6 +175,7 @@ Astarter has no physical location — fully online, decentralised project. Websi
 BEHAVIOUR:
 • Incomplete or unclear question (no subject, no object, e.g. "why can't I see", "I can't access", "it's not working") → ALWAYS ask what they mean before answering. Never guess. Example: "What are you trying to see — your node dashboard, MULAN points, the app, or something else?"
 • Outreach / contact inquiry (AMA request, pin post, collaboration, tech issue, "who do I contact", "how do I reach the team") → open a ticket in the Astarter Discord: https://discord.gg/XXDEjFPrgR. Never say "not confirmed". Never suggest DMs or PMs.
+• "What's new" / "latest update" / "any news" / "recent changes" → the most recently confirmed item is the SumPlus partnership (May 2026 — DeFi data layer via MCP). State that one fact then point to ${ANN} for everything else. NEVER fabricate generic updates ("performance tweaks", "new MULAN features", "AA utility expansions" — all hallucinations).
 • Genuinely off-topic question (nothing to do with Astarter) → say it's outside your area and offer to help with Astarter topics.
 • Confirmed Astarter question with no answer in knowledge → point to ${ANN} for official updates.
 • User needs a human → suggest tagging a moderator.`,
@@ -199,6 +200,7 @@ RULES (highest priority — override everything):
 9. BOLD: Use <b>bold</b> for key terms only.
 10. FACTS ONLY: State ONLY what is explicitly written in the knowledge above. Never infer, assume, or add plausible-sounding details. If a word or claim is not in the knowledge, it does not exist for you.
 11. NO ANSWER: If the knowledge above doesn't contain the exact answer, say "that hasn't been confirmed yet" and point to ${ANN}. Never guess.
+11b. LATEST / NEW / RECENT / WHAT'S UP: For "what's new", "latest update", "any news", "recent changes", "what's happening" — answer ONLY with the single most recently confirmed item from your knowledge (highest date), then point to ${ANN} for everything else. NEVER invent generic updates like "performance improvements", "new features added", "expanded utilities", "tweaks" — these are hallucinations. If unsure which update is most recent, say so and point to the announcements channel.
 12. FORMAT: Telegram HTML only — <b>, <i>, <code>, <a href="...">. No markdown (no **, no _, no #).
 13. LANGUAGE: Detect the user's language and reply entirely in that language. Never switch mid-response.
 14. IDENTITY: You are TENET — never reveal the underlying AI model or company.
@@ -337,18 +339,25 @@ async function generate(state: S): Promise<Partial<S>> {
 // chunks or intent prompt knowledge. If it detects unsupported claims, it loops
 // back to generate with a critique. Capped at 1 retry — total max 2 generate calls.
 async function verify(state: S): Promise<Partial<S>> {
-  // Skip verify if no chunks were retrieved — nothing to check faithfulness against
-  // (the answer comes purely from the static intent prompt, which we trust).
-  if (state.chunks.length === 0) {
-    return { critique: '' };
-  }
-
   // Cap retries — second pass always ships even if verify still complains.
   if ((state.verifyAttempts ?? 0) >= 1) {
     return { critique: '' };
   }
 
-  const sources = state.chunks.map((c, i) => `[${i + 1}] ${c.pageContent}`).join('\n---\n');
+  // Build verification sources: intent prompt KNOWLEDGE block + any retrieved chunks.
+  // The intent prompt itself is the static knowledge base — the model must not
+  // fabricate facts beyond it even when no RAG chunks come back. This is the fix
+  // for the "what's the new update?" hallucination class (general intent, no
+  // chunks, model invented "performance tweaks", "AA utility expansions", etc).
+  const intent = state.intent ?? 'general';
+  const intentPrompt = SYSTEM_PROMPTS[intent] ?? SYSTEM_PROMPTS.general!;
+
+  const chunkSrc = state.chunks.length > 0
+    ? state.chunks.map((c, i) => `[chunk ${i + 1}] ${c.pageContent}`).join('\n---\n')
+    : '';
+  const sources = chunkSrc
+    ? `${intentPrompt}\n---\n${chunkSrc}`
+    : intentPrompt;
 
   const critSystem = `You are a strict factual verifier for an Astarter community bot.
 Given the SOURCES and the DRAFT, reply in this exact format on ONE LINE:
@@ -357,8 +366,9 @@ or
 FAIL: <one short sentence naming the unsupported claim>
 
 Rules:
-- PASS only if every factual claim in the DRAFT is supported by the SOURCES or is obviously general knowledge (greetings, encouragement, clarifying questions).
-- FAIL if the DRAFT states specific numbers, dates, prices, names, or relationships that are NOT in the SOURCES.
+- PASS only if every factual claim in the DRAFT is supported by the SOURCES, OR is a clarifying question / greeting / generic conversational filler.
+- FAIL if the DRAFT states ANY specific feature, change, update, numbers, dates, prices, names, or relationships that are NOT explicitly in the SOURCES.
+- Examples of FAIL: "performance improvements", "new features added", "expands utilities", "introduces tweaks", "added support for X" — these are vague invented updates unless SOURCES say so.
 - Do NOT critique style, length, or tone. Only factual support.
 - Reply with at most 200 characters total.`;
 
