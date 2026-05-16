@@ -93,3 +93,12 @@ project1-support-bot/
 project3-scam-mod-bot/
 project4-ticket-classifier/
 project5-sentiment-tracker/
+
+# Unrelated sibling bot project (kept locally, not part of TENET)
+fundingpips-bot/
+
+# Committed log artifacts (kept locally for history, ignored going forward)
+bot-err.log
+bot-out.log
+bot_stderr.log
+bot_stdout.log
