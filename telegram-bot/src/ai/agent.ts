@@ -41,6 +41,8 @@ const ALLOWED_URLS = new Set([
   'https://x.com/UXLINKofficial',
   'https://uxlink.io',
   'https://linktr.ee/uxlink_official',
+  // Partner links — SumPlus
+  'https://www.sumplus.xyz',
 ]);
 
 // ── Intent-specific expert prompts ────────────────────────────────────────────
@@ -89,15 +91,16 @@ STRICT RULES:
   partnerships: `You are TENET, Astarter's AI assistant — expert on Astarter partnerships.
 
 KNOWLEDGE (use selectively):
-5 active partners: MULAN Labs · PayGo · Zeus Network · ENI/ENIAC · UXLINK.
+6 active partners: MULAN Labs · PayGo · Zeus Network · ENI/ENIAC · UXLINK · SumPlus.
 MULAN Labs (May 2026): community rewards/referral platform, MULAN point holders get AA airdrop + fee sharing. https://mulan.meme
 PayGo (April 2026): AI-native x402 payment protocol — AI agents pay each other autonomously. https://www.paygo.ac
 Zeus Network (April 2026): Bitcoin liquidity via zBTC (1:1 BTC-pegged) into Astarter ecosystem. https://zeusnetwork.xyz
 ENI/ENIAC (April 2026): enterprise modular L1 blockchain, cross-chain DeFi + co-incubation. https://eniac.network
 UXLINK (May 2026): leading Web3 social platform — social growth layer connecting global users, communities and builders. Partnership goal: integrate Astarter's AI-native infrastructure with UXLINK's social ecosystem to accelerate Web3 participation, autonomous coordination and on-chain growth. https://x.com/UXLINKofficial | https://uxlink.io | https://linktr.ee/uxlink_official
+SumPlus (May 2026): DeFi real-time data layer — gives Astarter AI Agents one-click access via MCP to TVL, protocol core indicators, heterogeneous chain ecology and cross-chain panoramic analysis. Delivers the "data vision" layer complementing Astarter's on-chain execution. https://www.sumplus.xyz
 
 BEHAVIOUR:
-• Vague question ("partners", "partnerships") → "Astarter has 5 active partners: MULAN Labs, PayGo, Zeus Network, ENI/ENIAC, and UXLINK." Ask which one they want details on.
+• Vague question ("partners", "partnerships") → "Astarter has 6 active partners: MULAN Labs, PayGo, Zeus Network, ENI/ENIAC, UXLINK, and SumPlus." Ask which one they want details on.
 • Named a specific partner → give that partner's details only (1–2 sentences max).
 • Partnership proposal / collaboration inquiry / business pitch / AMA request / any "who do I contact" question → give ONE clean sentence directing to Discord ticket. Do NOT echo back or list the user's categories. Example: "To get in touch with the team, open a ticket in the Astarter Discord — https://discord.gg/XXDEjFPrgR" Never say "not confirmed". Never suggest DMs or PMs.
 • Only state confirmed partnerships. Never speculate.`,
@@ -162,7 +165,7 @@ Twitter: https://x.com/AstarterDefiHub | Discord: https://discord.gg/XXDEjFPrgR
 Medium: https://medium.com/@AstarterDefiHub | Reddit: https://www.reddit.com/r/Astarter/
 YouTube: https://youtube.com/c/astartertv | Zealy: https://zealy.io/cw/astarterdefihub/leaderboard
 All links: https://linktr.ee/Astarter
-Partners: MULAN https://mulan.meme · PayGo https://www.paygo.ac · Zeus https://zeusnetwork.xyz · ENI https://eniac.network · UXLINK https://x.com/UXLINKofficial | https://uxlink.io | https://linktr.ee/uxlink_official
+Partners: MULAN https://mulan.meme · PayGo https://www.paygo.ac · Zeus https://zeusnetwork.xyz · ENI https://eniac.network · UXLINK https://x.com/UXLINKofficial | https://uxlink.io | https://linktr.ee/uxlink_official · SumPlus https://www.sumplus.xyz
 Return ONLY the exact URL requested. Nothing else.`,
 
   general: `You are TENET, Astarter's official community AI assistant. Be warm, concise, and direct.
@@ -225,7 +228,7 @@ const INTENT_KEYWORDS: Record<string, string[]> = {
   nodes:        ['node','abox','lite tier','pro tier','max tier','a-core','slot count','compute node','hardware node','buy node','node price','node cost'],
   mulan:        ['mulan','mulan point','nft star','redemption','redeem','convert point'],
   token:        ['aa token','token supply','emission','tge','vesting','allocation','token price','listing','airdrop'],
-  partnerships: ['partner','paygo','zeus network','eni','eniac','mulan labs','zbtc','bitcoin','x402','uxlink'],
+  partnerships: ['partner','paygo','zeus network','eni','eniac','mulan labs','zbtc','bitcoin','x402','uxlink','sumplus','mcp','defi data'],
   roadmap:      ['roadmap','q1 2026','q2 2026','q3 2026','q4 2026','2025','2027','mainnet','tge date','timeline','when launch','when mainnet','when tge'],
   team:         ['team','founder','investor','okx ventures','emurgo','advisor','backing','backer','who made','who built','who is behind'],
   developers:   ['developer','dev tool','sdk','api','framework','build on','grant program','open source','langchain'],
