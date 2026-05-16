@@ -6,6 +6,7 @@
 export class MemoryRedis {
     private store = new Map<string, string>();
     private lists = new Map<string, string[]>();
+    private sets  = new Map<string, Set<string>>();
     private timers = new Map<string, ReturnType<typeof setTimeout>>();
 
     private clearTimer(key: string): void {
@@ -78,7 +79,38 @@ export class MemoryRedis {
 
     async keys(pattern: string): Promise<string[]> {
         const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
-        const allKeys = [...this.store.keys(), ...this.lists.keys()];
+        const allKeys = [...this.store.keys(), ...this.lists.keys(), ...this.sets.keys()];
         return [...new Set(allKeys)].filter(k => regex.test(k));
+    }
+
+    // ── Set operations (used by semantic response cache) ─────────────────────
+    async sadd(key: string, ...members: string[]): Promise<number> {
+        if (!this.sets.has(key)) this.sets.set(key, new Set());
+        const set = this.sets.get(key)!;
+        let added = 0;
+        for (const m of members) {
+            if (!set.has(m)) { set.add(m); added++; }
+        }
+        return added;
+    }
+
+    async srem(key: string, ...members: string[]): Promise<number> {
+        const set = this.sets.get(key);
+        if (!set) return 0;
+        let removed = 0;
+        for (const m of members) {
+            if (set.delete(m)) removed++;
+        }
+        if (set.size === 0) this.sets.delete(key);
+        return removed;
+    }
+
+    async smembers(key: string): Promise<string[]> {
+        const set = this.sets.get(key);
+        return set ? [...set] : [];
+    }
+
+    async scard(key: string): Promise<number> {
+        return this.sets.get(key)?.size ?? 0;
     }
 }

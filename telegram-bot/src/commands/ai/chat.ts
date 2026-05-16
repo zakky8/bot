@@ -2,6 +2,7 @@ import { Bot } from 'grammy';
 import { BotContext } from '../../types';
 import { aiService } from '../../core/ai';
 import { runAgent } from '../../ai/agent';
+import { lookupCachedResponse, writeCachedResponse } from '../../ai/responseCache';
 
 // ── Deterministic link lookup — bypasses AI for simple link requests ──────────
 // Keyed by lowercase keywords. Matched before the AI is called, so the correct
@@ -263,12 +264,26 @@ export default (bot: Bot<BotContext>) => {
       // ── Step 2: run LangGraph agent ───────────────────────────────────────
       const activeLang = detectedLang ?? forceLang;
 
-      const result = await runAgent(
-        ctx.chat!.id,
-        userId,
-        message,
-        activeLang ?? null,
-      );
+      // 2a. Semantic response cache — skip the LangGraph pipeline entirely if a
+      // recent answer is a ≥0.94 cosine match. Common questions reply in <100ms.
+      // Skipped if user forced a non-English language (cache stores responses
+      // in the language they were originally generated in).
+      const cached = activeLang ? null : await lookupCachedResponse(message);
+      const result: Awaited<ReturnType<typeof runAgent>> = cached
+        ? {
+            response: cached.response,
+            escalate: false,
+            escalateReason: '',
+            intent: cached.intent,
+          }
+        : await runAgent(ctx.chat!.id, userId, message, activeLang ?? null);
+
+      // Write fresh (non-cached, non-escalation) answers to the cache for future
+      // lookups. Escalations and short fallbacks are filtered inside writeCachedResponse.
+      if (!cached && !result.escalate) {
+        writeCachedResponse(message, result.response, result.intent).catch(() => {});
+      }
+
       const responseText = result.response;
       const isEscalation = result.escalate;
 

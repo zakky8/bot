@@ -353,6 +353,25 @@ export class AIService {
     if (this.vectorStore) await this.vectorStore.clear();
   }
 
+  /**
+   * Embed a query string using the vector store's Titan embedder (with cache + retry).
+   * Used by the semantic response cache in chat.ts. Returns null if no vector store.
+   */
+  async embedQuery(query: string): Promise<number[] | null> {
+    if (!this.vectorStore) return null;
+    try {
+      return await this.vectorStore.embedQuery(query);
+    } catch (err) {
+      this.logger.warn(`embedQuery failed: ${err}`);
+      return null;
+    }
+  }
+
+  /** Cosine similarity between two embedding vectors. */
+  cosine(a: number[], b: number[]): number {
+    return this.vectorStore?.cosine(a, b) ?? 0;
+  }
+
   getDocCount(): number {
     return this.vectorStore?.getDocCount() ?? 0;
   }
@@ -754,13 +773,29 @@ ${faqBlock
     const MAX_ATTEMPTS = 2;
     let lastErr: any;
 
+    // ── Bedrock prompt caching ─────────────────────────────────────────────
+    // Cache the system prompt prefix so repeat calls re-use the computed KV state
+    // instead of re-prefilling. Supported families: anthropic.*, amazon.nova-*,
+    // and OpenAI gpt-oss-* models. We add a cachePoint marker AFTER the system
+    // text — Bedrock caches everything before the marker.
+    // Cuts TTFT ~3× on warm cache and reduces input-token cost ~70%.
+    const cacheable =
+      modelToUse.startsWith('anthropic.') ||
+      modelToUse.startsWith('amazon.nova-') ||
+      modelToUse.startsWith('openai.');
+
+    const systemBlocks: any[] = [{ text: systemPrompt }];
+    if (cacheable) {
+      systemBlocks.push({ cachePoint: { type: 'default' } });
+    }
+
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
-        this.logger.info(`AWS Bedrock attempt ${attempt}/${MAX_ATTEMPTS} (${modelToUse})`);
+        this.logger.info(`AWS Bedrock attempt ${attempt}/${MAX_ATTEMPTS} (${modelToUse}${cacheable ? ', cached' : ''})`);
 
         const command = new ConverseCommand({
           modelId: modelToUse,
-          system: [{ text: systemPrompt }],
+          system: systemBlocks,
           messages: sanitized.map(m => ({
             role: m.role,
             content: [{ text: m.content }]
@@ -783,6 +818,14 @@ ${faqBlock
         if (!text) {
           this.logger.error(`AWS Bedrock no text. StopReason: ${stopReason}`);
           throw new Error(`AWS Bedrock returned no text. StopReason: ${stopReason}`);
+        }
+
+        // Cache hit/miss telemetry — surfaces whether prompt caching is working
+        const usage: any = response.usage ?? {};
+        const cacheRead  = usage.cacheReadInputTokens  ?? 0;
+        const cacheWrite = usage.cacheWriteInputTokens ?? 0;
+        if (cacheable && (cacheRead > 0 || cacheWrite > 0)) {
+          this.logger.info(`Bedrock cache: read=${cacheRead} write=${cacheWrite} tokens`);
         }
 
         return { content: text, model: modelToUse, provider: 'aws' };

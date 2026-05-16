@@ -4,7 +4,7 @@ import { Redis } from 'ioredis';
 
 const logger = createLogger('AI');
 
-let redisClient: Redis | MemoryRedis;
+export let redisClient: Redis | MemoryRedis;
 
 if (process.env.REDIS_URL) {
     redisClient = new Redis(process.env.REDIS_URL);

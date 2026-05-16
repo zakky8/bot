@@ -219,6 +219,12 @@ const AgentState = Annotation.Root({
   response:      Annotation<string>({ reducer: (_, u) => u, default: () => '' }),
   escalate:      Annotation<boolean>({ reducer: (_, u) => u, default: () => false }),
   escalateReason:Annotation<string>({ reducer: (_, u) => u, default: () => '' }),
+  // ── Drafter-Critic loop state ─────────────────────────────────────────────
+  // verifyAttempts counts how many times the verify node has critiqued the response.
+  // Cap at 1 retry so we never spin more than 2 generate calls per /ask.
+  verifyAttempts: Annotation<number>({ reducer: (_, u) => u, default: () => 0 }),
+  // critique holds the verify node's feedback that the next generate call must address.
+  critique:       Annotation<string>({ reducer: (_, u) => u, default: () => '' }),
 });
 
 type S = typeof AgentState.State;
@@ -303,7 +309,13 @@ async function generate(state: S): Promise<Partial<S>> {
   // Language instruction
   const langNote = state.language ? `\nReply in ${state.language}.\n` : '';
 
-  const userPrompt = `${langNote}${histBlock}${context}\n\nUser: ${state.message}`;
+  // Critique block — only present on retry. Forces model to fix the issue the
+  // verify node flagged without rewriting the entire answer from scratch.
+  const critiqueBlock = state.critique
+    ? `\n\n# Critique from verifier (your previous draft had issues — fix these)\n${state.critique}\n`
+    : '';
+
+  const userPrompt = `${langNote}${histBlock}${context}${critiqueBlock}\n\nUser: ${state.message}`;
 
   let response: string;
   try {
@@ -315,13 +327,63 @@ async function generate(state: S): Promise<Partial<S>> {
     response = `I'm having trouble right now. Please check the announcements channel for the latest updates.`;
   }
 
-  return {
-    response,
-    history: [
-      { role: 'user',      content: state.message },
-      { role: 'assistant', content: response },
-    ],
-  };
+  // History is updated in outputCheck (the terminal node) with the final cleaned
+  // response. That way a rejected first-pass draft never pollutes memory.
+  return { response };
+}
+
+// ── Node 5: Verify (Drafter-Critic loop) ─────────────────────────────────────
+// Single LLM call that checks whether the draft adds facts NOT in the retrieved
+// chunks or intent prompt knowledge. If it detects unsupported claims, it loops
+// back to generate with a critique. Capped at 1 retry — total max 2 generate calls.
+async function verify(state: S): Promise<Partial<S>> {
+  // Skip verify if no chunks were retrieved — nothing to check faithfulness against
+  // (the answer comes purely from the static intent prompt, which we trust).
+  if (state.chunks.length === 0) {
+    return { critique: '' };
+  }
+
+  // Cap retries — second pass always ships even if verify still complains.
+  if ((state.verifyAttempts ?? 0) >= 1) {
+    return { critique: '' };
+  }
+
+  const sources = state.chunks.map((c, i) => `[${i + 1}] ${c.pageContent}`).join('\n---\n');
+
+  const critSystem = `You are a strict factual verifier for an Astarter community bot.
+Given the SOURCES and the DRAFT, reply in this exact format on ONE LINE:
+PASS
+or
+FAIL: <one short sentence naming the unsupported claim>
+
+Rules:
+- PASS only if every factual claim in the DRAFT is supported by the SOURCES or is obviously general knowledge (greetings, encouragement, clarifying questions).
+- FAIL if the DRAFT states specific numbers, dates, prices, names, or relationships that are NOT in the SOURCES.
+- Do NOT critique style, length, or tone. Only factual support.
+- Reply with at most 200 characters total.`;
+
+  const critUser = `SOURCES:\n${sources}\n\nDRAFT:\n${state.response}`;
+
+  try {
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('verify timeout')), 8000)
+    );
+    const verdict = await Promise.race([aiService.quickChat(critSystem, critUser, 80), timeout]);
+    const v = verdict.trim();
+
+    if (/^FAIL/i.test(v)) {
+      // Strip "FAIL:" prefix, pass critique to next generate
+      const critique = v.replace(/^FAIL\s*:?\s*/i, '').trim();
+      return {
+        critique,
+        verifyAttempts: (state.verifyAttempts ?? 0) + 1,
+        response: '', // clear so generate runs again
+      };
+    }
+    return { critique: '' }; // PASS — ship as-is
+  } catch {
+    return { critique: '' }; // verifier broke — fall through, ship draft
+  }
 }
 
 // ── Node 5: Output check (no LLM — pure regex) ───────────────────────────────
@@ -359,15 +421,31 @@ function outputCheck(state: S): Partial<S> {
     text = `I don't have confirmed details on that yet — check the announcements channel for the latest updates.`;
   }
 
-  return { response: text };
+  // Update conversation memory with the FINAL cleaned response only —
+  // rejected drafts from a failed verify pass never reach history.
+  return {
+    response: text,
+    history: [
+      { role: 'user',      content: state.message },
+      { role: 'assistant', content: text },
+    ],
+  };
 }
 
 // ── Graph assembly ────────────────────────────────────────────────────────────
+// classify → checkSentiment → retrieve → generate → verify
+//                                         ↑          │
+//                                         └──[FAIL]──┘
+//                                                    │
+//                                                  [PASS]
+//                                                    ↓
+//                                                outputCheck → END
 const workflow = new StateGraph(AgentState)
   .addNode('classify',       classify)
   .addNode('checkSentiment', checkSentiment)
   .addNode('retrieve',       retrieve)
   .addNode('generate',       generate)
+  .addNode('verify',         verify)
   .addNode('outputCheck',    outputCheck)
   .addEdge(START, 'classify')
   .addEdge('classify', 'checkSentiment')
@@ -376,7 +454,13 @@ const workflow = new StateGraph(AgentState)
     retrieve: 'retrieve',
   })
   .addEdge('retrieve', 'generate')
-  .addEdge('generate', 'outputCheck')
+  .addEdge('generate', 'verify')
+  // verify returns critique='' on PASS or critique='<reason>' on FAIL.
+  // FAIL → loop back to generate (only allowed once — verify itself caps attempts).
+  .addConditionalEdges('verify', (s: S) => s.critique ? 'generate' : 'outputCheck', {
+    generate: 'generate',
+    outputCheck: 'outputCheck',
+  })
   .addEdge('outputCheck', END);
 
 // MemorySaver: in-process checkpointing (conversation state persists across

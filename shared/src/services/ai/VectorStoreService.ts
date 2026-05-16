@@ -245,6 +245,24 @@ export class VectorStoreService {
     }
 
     /**
+     * Public embedding accessor — exposes the cached, retried embedding call.
+     * Used by the semantic response cache to match incoming queries against
+     * recently-answered ones without re-hitting the LLM.
+     */
+    async embedQuery(query: string): Promise<number[]> {
+        return this.getEmbedding(query);
+    }
+
+    /**
+     * Cosine similarity between two embedding vectors (public version).
+     * The semantic response cache uses this to match incoming queries to
+     * cached query embeddings without exposing the internal scoring math.
+     */
+    cosine(a: number[], b: number[]): number {
+        return this.cosineSimilarity(a, b);
+    }
+
+    /**
      * Search with optional metadata type filter.
      * Embedding is cached — calling this twice with the same query costs one AWS call, not two.
      * @param typeFilter If provided, only docs whose metadata.type is in this array are searched.
