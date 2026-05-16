@@ -315,8 +315,16 @@ export default (bot: Bot<BotContext>) => {
         /announcements?\s*channel(?:\s*\(?https?:\/\/t\.me\/Astarteranncmnt[^\s)]*\)?)?/gi,
         `<a href="${ANN_URL}">announcements channel</a>`
       );
-      // Step 2: Strip any leftover raw URL not inside an href
-      text = text.replace(/(?<!href=")https?:\/\/t\.me\/Astarteranncmnt\S*/gi, '');
+      // Step 2: Strip any leftover raw URL not inside an href.
+      // Also eats preceding connectors ("at", "here:", "—") + dangling punctuation
+      // so we never end up with orphan colons like "see the channel for updates: "
+      text = text.replace(
+        /[\s,:;—–-]*\b(?:at|here|see|visit|check|via)?\s*:?\s*(?<!href=")https?:\/\/t\.me\/Astarteranncmnt\S*/gi,
+        ''
+      );
+      // Tidy: collapse double spaces and strip trailing punctuation/whitespace
+      // left behind when the URL was the last thing in the line.
+      text = text.replace(/[ \t]+/g, ' ').replace(/[\s:;,.—–-]+$/g, '').trim();
 
       // Step 3: Dead-end guard — if the reply is a "not announced/confirmed yet" answer
       // and still has no channel reference, inject one. The model often truncates the
