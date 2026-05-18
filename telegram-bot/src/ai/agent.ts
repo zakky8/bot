@@ -12,6 +12,7 @@ import { aiService } from '../core/ai';
 import { tryCannedReply, cannedIntent } from './fastPath';
 import { verifyDraft } from './verifier';
 import { rerankChunks } from './reranker';
+import { speculativeRAG } from './speculative';
 
 const ANN = 'https://t.me/Astarteranncmnt';
 
@@ -407,14 +408,50 @@ async function generate(state: S): Promise<Partial<S>> {
 
   const userPrompt = `${langNote}${histBlock}${context}${critiqueBlock}\n\nUser: ${state.message}`;
 
-  let response: string;
-  try {
-    const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('generate timeout')), 28000)
-    );
-    response = await Promise.race([aiService.quickChat(system, userPrompt, 1024), timeout]);
-  } catch {
-    response = `I'm having trouble right now. Please check the announcements channel for the latest updates.`;
+  let response: string | null = null;
+
+  // ── Speculative RAG fast path ────────────────────────────────────────────────
+  // Ported from FP-discord pipeline/speculative.rs. Runs 3 parallel cheaper
+  // drafters + 1 tiny scorer call. Per the Wang et al. 2024 paper: -51%
+  // latency + 12.97% accuracy gain when ≥4 chunks are available.
+  //
+  // Gated:
+  //  • ≥4 chunks (otherwise partition is pointless → fall back to standard)
+  //  • Not a retry (state.critique present means previous draft failed verify
+  //    — give the standard path another shot with the critique injected,
+  //    don't re-speculate)
+  //  • Standard generate is the safe fallback on any speculative failure
+  //
+  // For the user prompt body we pass WITHOUT the duplicate context block
+  // (speculative.ts adds its own per-drafter context partition).
+  const canSpeculate = state.chunks.length >= 4 && !state.critique;
+  if (canSpeculate) {
+    try {
+      const userPromptNoContext = `${langNote}${histBlock}\n\nUser: ${state.message}`;
+      const specResult = await speculativeRAG({
+        systemPrompt: system,
+        userPromptBody: userPromptNoContext,
+        chunks: state.chunks,
+      });
+      if (specResult && specResult.trim().length >= 20) {
+        response = specResult;
+      }
+    } catch {
+      // Fall through to standard generate
+    }
+  }
+
+  // Standard single-shot generate — used when speculative is gated off,
+  // returns null, or throws. This is the SAFE PATH.
+  if (response === null) {
+    try {
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('generate timeout')), 28000)
+      );
+      response = await Promise.race([aiService.quickChat(system, userPrompt, 1024), timeout]);
+    } catch {
+      response = `I'm having trouble right now. Please check the announcements channel for the latest updates.`;
+    }
   }
 
   // History is updated in outputCheck (the terminal node) with the final cleaned
