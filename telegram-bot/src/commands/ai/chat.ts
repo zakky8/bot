@@ -61,18 +61,38 @@ const LINK_LOOKUP: Array<{ keywords: string[]; url: string; label: string }> = [
 // Returns a match only when the message is clearly asking FOR a specific link —
 // not when the user is asking ABOUT something that mentions a platform name.
 function detectLinkRequest(message: string): { url: string; label: string } | null {
-  const lower = message.toLowerCase().trim();
+  // Strip leading command prefixes (/ask, /ai, !ask) and "[Referring to: ...]" suffix
+  // so word count + intent detection see the actual question, not the wrapper.
+  let cleaned = message
+    .replace(/^\/(ask|ai|chat)\b\s*/i, '')
+    .replace(/\n*\[Referring to:[\s\S]*?\]\s*$/i, '')
+    .trim();
 
-  // Must contain a link-intent signal — either an explicit request word or be very short (≤5 words)
+  const lower = cleaned.toLowerCase().trim();
+  if (!lower) return null;
+
+  // Must contain a link-intent signal — either an explicit request word or be very short (≤6 words)
   const wordCount = lower.split(/\s+/).length;
   const hasLinkIntent =
-    /\b(link|url|website|site|page|channel|account|address|give|send|share|where)\b/.test(lower) ||
+    /\b(link|url|website|site|page|channel|account|address|give|send|share|where|list)\b/.test(lower) ||
     // Russian: дай/дайте (give), ссылку/ссылки (link/links), покажи (show)
     /(дай|дайте|ссылк|покажи|соцсет|социальн)/.test(lower) ||
     wordCount <= 5;
 
   if (!hasLinkIntent) return null;
 
+  // ── HIGHEST PRIORITY: "list" / "all" / "every link" requests → ALWAYS return the
+  //   linktree. The model loves to dump every URL raw when asked for a "list".
+  //   Catch this BEFORE the per-platform keyword loop to prevent dump responses.
+  const isFullListRequest =
+    /\b(all|every|full|complete|entire)\b.*\blinks?\b/.test(lower) ||
+    /\blinks?\b.*\b(list|all)\b/.test(lower) ||
+    /\b(list of|give me all|show me all|list all)\b/.test(lower);
+  if (isFullListRequest) {
+    return { url: 'https://linktr.ee/Astarter', label: 'All Official Links' };
+  }
+
+  // Per-platform specific link match
   for (const entry of LINK_LOOKUP) {
     if (entry.keywords.some(kw => lower.includes(kw))) {
       return { url: entry.url, label: entry.label };
@@ -81,7 +101,7 @@ function detectLinkRequest(message: string): { url: string; label: string } | nu
 
   // Catch-all: short "X links" queries not matched above (e.g. "astarter links",
   // "official links") → linktree has the complete up-to-date list
-  if (wordCount <= 5 && /\blinks?\b/.test(lower)) {
+  if (wordCount <= 6 && /\blinks?\b/.test(lower)) {
     return { url: 'https://linktr.ee/Astarter', label: 'All Official Links' };
   }
 
