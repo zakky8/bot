@@ -386,9 +386,13 @@ async function generate(state: S): Promise<Partial<S>> {
   const systemBase = SYSTEM_PROMPTS[intent] ?? SYSTEM_PROMPTS.general!;
   const system = `${systemBase}\n\n${BASE_RULES}`;
 
-  // Build context from chunks
+  // Build context from chunks — each chunk gets an index [N] so the model can
+  // cite which one it's drawing each claim from. Citation markers are stripped
+  // from the user-facing output in outputCheck. Pattern source: Anthropic
+  // Citations API docs ("increasing recall accuracy by up to 15%"; Endex
+  // customer case: 10% → 0% source hallucinations).
   const context = state.chunks.length > 0
-    ? `\n\n# Retrieved Context (use this — it is verified and current)\n${state.chunks.map(c => c.pageContent).join('\n---\n')}`
+    ? `\n\n# Retrieved Context (numbered — cite [N] when you use a fact)\n${state.chunks.map((c, i) => `[${i + 1}] ${c.pageContent}`).join('\n---\n')}\n\nCITATION RULE: When you state a specific fact from the context above, append the source marker like [1] or [2] right after that claim. If a claim has no source in the context, do NOT state it — substitute "that hasn't been confirmed" instead. The [N] markers will be stripped before the user sees your reply, so add them freely — they cost nothing.`
     : '';
 
   // Build history block (last 3 turns)
@@ -540,6 +544,17 @@ function outputCheck(state: S): Partial<S> {
   // Edge case: model wrote opening <thinking> but never closed it (e.g. ran out of
   // tokens). Drop everything from <thinking> to end of string in that case.
   text = text.replace(/<(thinking|think|reasoning|reason)>[\s\S]*$/i, '').trim();
+
+  // Strip citation markers [1], [2], [3]... that the model added per Anthropic's
+  // citation rule. They served their purpose (forced source-grounding); user
+  // doesn't need to see them. Matches single digit AND multi-citation patterns:
+  //   • " [1]" / "[2]" / "[10]"
+  //   • " [1, 2]" / "[1,2,3]"
+  //   • " [1] [2]"
+  // Run BEFORE URL stripping so we don't accidentally eat IPv6 brackets etc.
+  text = text.replace(/\s*\[\d+(?:\s*,\s*\d+)*\]/g, '').trim();
+  // Collapse the double-spaces this might leave behind (" word  word" → " word word")
+  text = text.replace(/  +/g, ' ');
 
   // Fix common model typos for project name
   text = text.replace(/Astaster/g, 'Astarter').replace(/astaster/g, 'astarter');
