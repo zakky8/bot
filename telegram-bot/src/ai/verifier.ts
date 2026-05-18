@@ -32,7 +32,7 @@
 import { aiService } from '../core/ai';
 
 const CLAIMS_PER_BATCH = 2;
-const MAX_PARALLEL_BATCHES = 4;
+const MAX_PARALLEL_BATCHES = 5; // matches FP-discord (verify/mod.rs:168-195)
 const EXTRACTION_TIMEOUT_MS = 6000;
 const JUDGE_TIMEOUT_MS = 5000;
 const MAX_CLAIMS = 8; // cap to keep verify budget bounded
@@ -255,7 +255,40 @@ async function judgeOneBatch(
     ? `You are a PERMISSIVE fact judge. Mark a claim as SUPPORTED if the SOURCES contain the same information even with different wording, paraphrasing, or rearrangement. Only mark UNSUPPORTED if the SOURCES truly do NOT contain the claim's information.`
     : `You are a STRICT fact judge. Mark a claim as SUPPORTED only if the SOURCES explicitly contain the same information. Vague matches are NOT enough. Numbers, dates, and names must match exactly.`;
 
-  const sys = `${judgePolicy}
+  // Adversarial worked examples — teaches the judge to catch the 5 common trap
+  // patterns that gpt-oss-120b otherwise misses. Ported from FP-discord
+  // verify/mod.rs:355-410 (Iran-restriction + FCA-regulation traps adapted to
+  // Astarter facts).
+  const examples = `
+
+WORKED EXAMPLES (study these patterns):
+
+Example 1 — number swap trap
+SOURCES: "LITE Node is $500 with 12,000 slots"
+CLAIM: "LITE Node has 12,000 slots and costs $1,000"
+VERDICT: [1] UNSUPPORTED: price is $500 not $1,000
+
+Example 2 — invented detail trap
+SOURCES: "Astarter has 6 active partners: MULAN, PayGo, Zeus, ENI, UXLINK, SumPlus"
+CLAIM: "Astarter has 6 partners including Binance and OKX"
+VERDICT: [1] UNSUPPORTED: Binance/OKX are NOT partners — only the 6 listed
+
+Example 3 — paraphrase that's actually correct (do NOT flag)
+SOURCES: "TGE target Q2-Q3 2026 — NOT confirmed"
+CLAIM: "The token launch is targeted for mid-2026 but the exact date isn't confirmed"
+VERDICT: [1] SUPPORTED
+
+Example 4 — confident invention trap
+SOURCES: (no info on AA token price)
+CLAIM: "The AA token will list at $0.05"
+VERDICT: [1] UNSUPPORTED: no AA price in sources — pure invention
+
+Example 5 — partial truth trap
+SOURCES: "MULAN Revenue Tiers: $100 → 10% · $500 → 25% · $1,000 → 50%"
+CLAIM: "MULAN gives 50% fee share at $500 tier"
+VERDICT: [1] UNSUPPORTED: 50% is the $1,000 tier, not $500`;
+
+  const sys = `${judgePolicy}${permissive ? '' : examples}
 
 OUTPUT FORMAT (one line per claim, in input order, exact format):
 [N] SUPPORTED

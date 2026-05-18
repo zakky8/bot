@@ -434,6 +434,34 @@ async function verify(state: S): Promise<Partial<S>> {
     return { critique: '' };
   }
 
+  // Strip <thinking> blocks BEFORE verification so the verifier judges only the
+  // user-facing answer, not the model's hidden reasoning (which may contain
+  // exploratory claims not meant as facts).
+  const draftForVerify = (state.response ?? '')
+    .replace(/<(thinking|think|reasoning|reason)>[\s\S]*?<\/\1>/gi, '')
+    .replace(/<(thinking|think|reasoning|reason)>[\s\S]*$/i, '')
+    .trim();
+
+  // ── CRAG fast-path skip-verify router ──────────────────────────────────────
+  // Ported from FP-discord fast_path.rs::decide. Skip the verifier entirely for
+  // safe replies that have nothing fact-checkable — saves ~600-1200ms on ~30%
+  // of traffic. Skip conditions:
+  //   • Response is very short (under 60 chars) — likely "I don't have that
+  //     confirmed" or a quick clarification — no factual claims to judge.
+  //   • Response is an "I don't have X" abstain — explicit refusal, nothing
+  //     to verify.
+  //   • Response is only a URL directive (open ticket / link request) — URL
+  //     is allow-list-checked elsewhere.
+  //   • Response is a clarification question (ends with ?) and short.
+  const trimmed = draftForVerify.toLowerCase();
+  const isAbstain = /\b(i don'?t have|hasn'?t been (confirmed|announced|published)|not in my knowledge|not confirmed)\b/.test(trimmed);
+  const isClarifyingQ = draftForVerify.endsWith('?') && draftForVerify.length < 200;
+  const isUrlDirective = /open a (support )?ticket/i.test(draftForVerify) && draftForVerify.length < 200;
+  const isVeryShort = draftForVerify.length < 60;
+  if (isAbstain || isClarifyingQ || isUrlDirective || isVeryShort) {
+    return { critique: '' }; // skip verify, ship as-is
+  }
+
   // Build verification sources: intent prompt KNOWLEDGE block + any retrieved chunks.
   // The intent prompt itself is the static knowledge base — the model must not
   // fabricate facts beyond it even when no RAG chunks come back. This is the fix
@@ -448,14 +476,6 @@ async function verify(state: S): Promise<Partial<S>> {
   const sources = chunkSrc
     ? `${intentPrompt}\n---\n${chunkSrc}`
     : intentPrompt;
-
-  // Strip <thinking> blocks BEFORE verification so the verifier judges only the
-  // user-facing answer, not the model's hidden reasoning (which may contain
-  // exploratory claims not meant as facts).
-  const draftForVerify = (state.response ?? '')
-    .replace(/<(thinking|think|reasoning|reason)>[\s\S]*?<\/\1>/gi, '')
-    .replace(/<(thinking|think|reasoning|reason)>[\s\S]*$/i, '')
-    .trim();
 
   try {
     const result = await verifyDraft(sources, draftForVerify);
