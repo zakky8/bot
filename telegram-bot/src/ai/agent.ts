@@ -269,7 +269,7 @@ const INTENT_KEYWORDS: Record<string, string[]> = {
   roadmap:      ['roadmap','q1 2026','q2 2026','q3 2026','q4 2026','2025','2027','mainnet','tge date','timeline','when launch','when mainnet','when tge'],
   team:         ['team','founder','investor','okx ventures','emurgo','advisor','backing','backer','who made','who built','who is behind'],
   developers:   ['developer','dev tool','sdk','api','framework','build on','grant program','open source','langchain'],
-  links:        ['link','url','website','homepage','discord','twitter','telegram','medium','reddit','youtube','zealy','gitbook'],
+  links:        ['link','url','website','homepage','discord','twitter','telegram','medium','reddit','youtube','zealy','gitbook','uxlink','sumplus','paygo','zeus','eniac'],
   project:      ['what is astarter','astarter is','about astarter','location','office','hq','headquarter','web4','depin','core agent'],
 };
 const NEGATIVE_WORDS = ['scam','rug','fraud','fake','lie','lying','cheat','stolen','lost','angry','frustrated','useless','terrible','worst','broken','failed','refund','sue','legal'];

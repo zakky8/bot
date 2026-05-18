@@ -17,6 +17,10 @@ const LINK_LOOKUP: Array<{ keywords: string[]; url: string; label: string }> = [
     url: 'https://zeusnetwork.xyz', label: 'Zeus Network' },
   { keywords: ['eni website', 'eniac website', 'eni link', 'eniac link', 'eni url', 'eniac url', 'eniac web'],
     url: 'https://eniac.network', label: 'ENI / ENIAC' },
+  { keywords: ['uxlink website', 'uxlink link', 'uxlink url', 'uxlink web', 'uxlink site', 'uxlink official'],
+    url: 'https://uxlink.io', label: 'UXLINK' },
+  { keywords: ['sumplus website', 'sumplus link', 'sumplus url', 'sumplus web', 'sumplus site'],
+    url: 'https://www.sumplus.xyz', label: 'SumPlus' },
   // ── Astarter official links
   { keywords: ['gitbook', 'docs', 'documentation', 'whitepaper', 'guide', 'wiki', 'manual'],
     url: 'https://astarter.gitbook.io/astarter', label: 'Gitbook / Docs' },

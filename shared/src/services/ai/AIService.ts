@@ -143,7 +143,7 @@ MULAN Labs (May 2026): Referral/traffic platform. MULAN point holders get AA air
 PayGo (April 2026): AI-native x402 payment protocol — AI agents pay each other autonomously. https://www.paygo.ac
 Zeus Network (April 2026): Bitcoin liquidity via zBTC (1:1 BTC-pegged), cross-chain BTC into Astarter. https://zeusnetwork.xyz
 ENI/ENIAC Network (April 2026): Enterprise modular L1, cross-chain DeFi + co-incubation. https://eniac.network
-UXLINK (May 2026): Leading Web3 social platform — connects global users, communities and builders. Partnership goal: integrate Astarter's AI-native infrastructure with UXLINK's social ecosystem to accelerate Web3 participation, autonomous coordination and on-chain growth. https://x.com/UXLINKofficial
+UXLINK (May 2026): Leading Web3 social platform — connects global users, communities and builders. Partnership goal: integrate Astarter's AI-native infrastructure with UXLINK's social ecosystem to accelerate Web3 participation, autonomous coordination and on-chain growth. https://x.com/UXLINKofficial | https://uxlink.io | https://linktr.ee/uxlink_official
 SumPlus (May 2026): DeFi real-time data layer — gives Astarter AI Agents one-click access via MCP to TVL, protocol indicators, heterogeneous chain ecology and cross-chain panoramic analysis. The "data vision" layer complementing Astarter's on-chain execution. https://www.sumplus.xyz`,
 
   roadmap: `## Roadmap Expert Knowledge
@@ -546,7 +546,7 @@ Link rules:
 • NEVER substitute linktree when a specific URL was requested.
 • NEVER append links to factual answers unless the user asked for a link.
 • NEVER add "check the announcements channel" or any channel/link at the end of an answer unless the user asked for it.
-• Contact/listing/partnership enquiries → email only: <code>contact@astarter.io</code>
+• Contact/listing/partnership/support enquiries → open a ticket in the Astarter Discord: https://discord.gg/XXDEjFPrgR
 • Gitbook/docs is DOCUMENTATION, not a social media channel. NEVER include it when listing socials/social media links.
 • When asked for "social media", "all socials", "social links", or equivalent in any language → respond with ONLY: https://linktr.ee/Astarter
 • If an entity (partner, product, feature) has no URL in this table → do NOT give any URL for it. Do not substitute linktree.
@@ -563,7 +563,7 @@ Detect the language of the user's message and reply fully in that language. Arab
 # Knowledge Base
 ${faqBlock
   ? `Your verified knowledge is below. Use it to answer accurately. Synthesize it in your own words — never paste it verbatim or dump entire entries. If the user asks about ONE specific item from a multi-part answer, give ONLY that item:\n\n${faqBlock}`
-  : `Knowledge base is loading. Direct specific questions to contact@astarter.io or the official channels.`}`;
+  : `Knowledge base is loading. For specific questions, open a ticket in the Astarter Discord: https://discord.gg/XXDEjFPrgR`}`;
     // ─────────────────────────────────────────────────────────────────────────
 
     return this.cachedSystemPrompt;

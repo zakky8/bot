@@ -278,7 +278,7 @@ export default (bot: Bot<BotContext>) => {
 
       const lines = results.map((r, i) => {
         const score = r.score.toFixed(3);
-        const threshold = r.score >= 0.35 ? '✅' : '❌ below threshold';
+        const threshold = r.score >= 0.32 ? '✅' : '❌ below threshold';
         const preview = r.pageContent.slice(0, 120).replace(/\n/g, ' ');
         const type = r.metadata?.type ?? 'unknown';
         return `<b>#${i + 1}</b> score: <code>${score}</code> ${threshold} [${type}]\n<i>${preview}…</i>`;
@@ -291,6 +291,51 @@ export default (bot: Bot<BotContext>) => {
     } catch (err: any) {
       return ctx.reply(`❌ Error: <code>${err?.message}</code>`, { parse_mode: 'HTML' });
     }
+  });
+
+  // ── /indexfaq — bulk-index all faq_data.json entries into the vector store ──
+  // The FAQ file has 22+ Q&A entries. Without this the vector store only has the
+  // original 9 astarter_deck chunks and RAG misses most questions.
+  // Run once after a fresh deploy or after faq_data.json changes.
+  bot.command('indexfaq', async (ctx: BotContext) => {
+    if (!isOwner(ctx)) return denyAccess(ctx, true);
+
+    const faqPath = require('path').join(process.cwd(), 'faq_data.json');
+    let faqEntries: Array<{ q: string; a: string }> = [];
+    try {
+      faqEntries = JSON.parse(require('fs').readFileSync(faqPath, 'utf-8'));
+    } catch (err: any) {
+      return ctx.reply(`❌ Cannot read faq_data.json: <code>${err?.message}</code>`, { parse_mode: 'HTML' });
+    }
+
+    if (faqEntries.length === 0) {
+      return ctx.reply('⚠️ faq_data.json is empty.');
+    }
+
+    const statusMsg = await ctx.reply(
+      `⚙️ Indexing <b>${faqEntries.length}</b> FAQ entries into vector store…\n<i>This takes ~${Math.ceil(faqEntries.length * 1.5)}s (one embed call per entry)</i>`,
+      { parse_mode: 'HTML' }
+    );
+
+    let ok = 0; let fail = 0;
+    for (const entry of faqEntries) {
+      const text = `Q: ${entry.q}\nA: ${entry.a}`;
+      try {
+        await aiService.addDocument(text, { source: 'faq_data.json', type: 'manual' });
+        ok++;
+      } catch {
+        fail++;
+      }
+    }
+
+    const total = aiService.getDocCount();
+    await ctx.api.editMessageText(ctx.chat!.id, statusMsg.message_id,
+      `✅ <b>FAQ indexed!</b>\n\n` +
+      `• Indexed: <code>${ok}</code> entries\n` +
+      `• Failed: <code>${fail}</code>\n` +
+      `• Total vectors now: <code>${total}</code>`,
+      { parse_mode: 'HTML' }
+    ).catch(() => ctx.reply(`✅ Done — ${ok} indexed, ${fail} failed. Total vectors: ${total}`));
   });
 
   // ── /updatedocs ────────────────────────────────────────────────────────────
