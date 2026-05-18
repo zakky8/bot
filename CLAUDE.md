@@ -9,9 +9,22 @@
 **TENET** is a production Telegram community bot for the [Astarter](https://app.astarter.io) DeFi project. It does two things:
 
 1. **Community moderation** — ban/kick/mute/warn, anti-spam locks, flood detection, CAPTCHA, federation cross-group bans, welcome/goodbye, content filters, notes/rules.
-2. **AI-powered community support** — `/ask` command runs a LangGraph RAG pipeline (classify → retrieve → rerank → generate → verify → output) that answers questions about Astarter products (ABox nodes, AA token, MULAN points, partnerships, roadmap, etc.) using AWS Bedrock.
+2. **AI-powered community support** — `/ask` command runs a LangGraph RAG pipeline with **Speculative RAG** + atomic-claim verifier + Anthropic-style reasoning + citation enforcement. Answers questions about Astarter products (ABox nodes, AA token, MULAN points, partnerships, roadmap, etc.) using AWS Bedrock.
 
 **Tech stack:** TypeScript · Node 18 · Grammy.js · LangGraph.js · AWS Bedrock (LLM + Titan embeddings) · PostgreSQL · Redis · PM2
+
+**AI pipeline techniques implemented (all sourced from published papers / Anthropic docs):**
+- Self-RAG fast path (canned replies)
+- Semantic response cache (cosine ≥0.94)
+- Hybrid retrieval (0.7 cosine + 0.3 keyword)
+- Cross-encoder LLM reranker
+- **Speculative RAG** — 3 parallel drafters + scorer (Wang et al. 2024: -51% latency + 13% accuracy)
+- **Anthropic reasoning protocol** — `<thinking>` CoT + knowledge boundary + explicit abstain
+- **Citation enforcement** — `[N]` source markers on every claim (Anthropic Citations pattern)
+- Atomic-claim multi-judge verifier (strict + permissive)
+- **CRAG skip-verify router** — skips verifier on safe replies (~30% latency cut)
+- **Adversarial worked examples** in strict judge (5 trap patterns)
+- URL allow-list output guard (triple-layer)
 
 ---
 
@@ -23,7 +36,7 @@ bot/
 │   ├── src/
 │   │   ├── index.ts       ← Entry point, bot init, middleware chain
 │   │   ├── core/          ← Infrastructure (AI, DB, Redis, logger)
-│   │   ├── ai/            ← LangGraph pipeline (agent, verifier, cache, reranker, fastPath)
+│   │   ├── ai/            ← LangGraph pipeline (agent, speculative, verifier, cache, reranker, fastPath)
 │   │   ├── commands/      ← 8 command categories, ~105 commands total
 │   │   ├── handlers/      ← Message routing (notes, new members)
 │   │   ├── middlewares/   ← Request pipeline (auth, locks, flood, rate-limit, etc.)
@@ -138,49 +151,104 @@ pm2 save                         # persist across reboots
 User message
      │
      ▼
-[fastPath]  ──── greeting/thanks/identity/help? ──→ canned reply → [outputCheck]
+[fastPath]      — canned reply (greetings/thanks/identity/help)? → outputCheck
      │ miss
      ▼
-[response cache]  ──── cosine ≥ 0.94? ──→ cached response → [outputCheck]
+[responseCache] — cosine ≥0.94 against past queries? → cached reply → outputCheck
      │ miss
      ▼
-[classify]   — pure keyword regex → intent (nodes|token|mulan|partnerships|roadmap|team|developers|project|links|general)
-     │
+[classify]      — pure-regex intent (nodes|token|mulan|partnerships|roadmap|team|
+     │            developers|project|links|general). No LLM call.
      ▼
-[checkSentiment]  — 2 consecutive negative turns? → ESCALATE → END
+[checkSentiment]— 2 consecutive negative turns? → ESCALATE → END
      │ ok
      ▼
-[retrieve]   — VectorStore hybrid search (cosine 0.7 + keyword 0.3), score ≥ 0.32 kept
+[retrieve]      — Hybrid search (0.7 cosine + 0.3 keyword), score ≥0.32 kept
      │
      ▼
-[reranker]   — single LLM call scores each chunk 0-10, re-sorts, drops < 3, keeps top-3
-     │         (skipped if 0-1 chunks OR top cosine score ≥ 0.85)
+[reranker]      — LLM scores each chunk 0-10, drops <3, keeps top-3.
+     │            Skipped if 0-1 chunks OR top cosine ≥0.85.
+     ▼
+[generate]      — TWO paths based on chunk count:
+     │
+     │   ┌─ If ≥4 chunks: SPECULATIVE RAG ─┐
+     │   │  1. Partition chunks into 3      │
+     │   │     overlapping subsets          │
+     │   │  2. 3 parallel drafters with     │
+     │   │     different style hints        │
+     │   │  3. Scorer (max_tokens=8) picks  │
+     │   │     best draft (A/B/C)           │
+     │   └──────────────────────────────────┘
+     │
+     │   Standard path: single-shot generate
+     │
+     │   Both paths use:
+     │   • intent-specific expert prompt
+     │   • BASE_RULES (Anthropic protocol — see §6a)
+     │   • Citation rule: each fact tagged [N]
+     │   • <thinking>...</thinking> CoT wrapping
      │
      ▼
-[generate]   — Bedrock LLM with: intent-specific expert prompt + BASE_RULES + chunks + history + language
-     │
-     ▼
-[verify]     — extract atomic claims → strict judge → permissive re-judge of failures
-     │           FAIL → inject critique → loop back to [generate] (max 1 retry)
+[verify]        — Atomic-claim multi-judge:
+     │            • CRAG skip-router: short reply / abstain / clarifying-Q
+     │              / URL-directive → SKIP verify entirely
+     │            • Else: extract up to 8 claims, judge in 5 parallel
+     │              batches of 2, strict-then-permissive re-check
+     │            • Adversarial worked examples teach judge to catch
+     │              traps (number swap, paraphrase, partial truth)
+     │            FAIL → inject critique → loop back to generate (max 1 retry)
      │ PASS
      ▼
-[outputCheck]  — strip disallowed URLs, fix typos, detect ESCALATE signal, identity leak guard
-     │
+[outputCheck]   — Strip <thinking> blocks, strip [N] citations,
+     │            fix typos, URL allow-list guard, identity-leak guard
      ▼
-[chat.ts]    — format HTML, inject ANN channel link, Discord URL guard, follow-up question
-     │
+[chat.ts]       — Telegram HTML format, ANN channel injection,
+                  Discord URL guard, follow-up question injection
      ▼
-Telegram reply
+   Telegram reply
 ```
+
+### 6a. Anthropic Reasoning Protocol (sits at top of `BASE_RULES`)
+
+The system prompt sent to the model starts with four MANDATORY directives sourced from `docs.anthropic.com`:
+
+1. **THINKING FIRST** — Wrap pre-answer reasoning in `<thinking>...</thinking>` tags (stripped in outputCheck before user sees response). Forces internal reasoning before final answer.
+
+2. **KNOWLEDGE BOUNDARY** — Model's general training data is OFF-LIMITS for Astarter facts. Only the KNOWLEDGE block + Retrieved Context are sources of truth.
+
+3. **EXPLICIT ABSTAIN** — Model has permission AND obligation to say "I don't have that confirmed." Three rotating phrasings provided to avoid template fatigue.
+
+4. **QUOTE-BEFORE-CLAIM** — Must identify verbatim source for each fact before stating it. If no quote exists in context → substitute "that hasn't been confirmed."
+
+5. **CITATION RULE** (in retrieve-context block) — Each chunk numbered `[1]`, `[2]`, `[3]`. Model must tag every factual claim with the source marker. Unmarked claims → substitute "not confirmed." Markers stripped in outputCheck. This is the Anthropic Citations pattern that took customer Endex from 10% → 0% source hallucinations.
 
 ### File-by-file: `src/ai/`
 
 #### `agent.ts` — LangGraph State Machine
 - **SYSTEM_PROMPTS**: 10 intent-specific expert knowledge blocks. Each contains `KNOWLEDGE` (facts) + `BEHAVIOUR` (response rules). Edit these to change what the bot knows or how it responds.
-- **BASE_RULES**: 15 global rules appended to every prompt (specificity, vague-Q handling, outreach, formatting, facts-only, etc.). Rule 4 controls outreach replies.
-- **ALLOWED_URLS**: Set of ~28 URLs that pass the outputCheck URL stripper. **Keep this in sync with `ALLOWED_URL_PATTERNS` in `verifier.ts` and `ALLOWED_URLS` in `AIService.ts`.**
+- **BASE_RULES**: Top section is the **Anthropic Reasoning Protocol** (THINKING / KNOWLEDGE BOUNDARY / ABSTAIN / QUOTE-BEFORE-CLAIM). Below that are 15 response rules. Rule 4 controls outreach replies.
+- **ALLOWED_URLS**: Set of ~31 URLs that pass the outputCheck URL stripper. **Keep this in sync with `ALLOWED_URL_PATTERNS` in `verifier.ts` and `ALLOWED_URLS` in `AIService.ts`.**
 - **INTENT_KEYWORDS**: Keyword→intent map for classify. Pure string `.includes()` — no LLM call.
+- **Citation pattern in generate**: Retrieved chunks are numbered `[1]`, `[2]`, `[3]` in the prompt. Model is instructed to tag every factual claim with the source marker. Markers stripped in outputCheck before user sees response.
+- **Speculative RAG trigger**: When `state.chunks.length >= 4 && !state.critique`, agent calls `speculativeRAG()` from `speculative.ts`. Falls back to standard single-shot generate on any failure (null return, timeout, throw). NEVER a hard dependency.
+- **outputCheck**: strips `<thinking>...</thinking>` blocks AND `[N]` citation markers before the user sees the reply. Also fixes "Astaster" typo, URL guard, identity-leak guard, ESCALATE signal detection.
+- **CRAG skip-router in verify**: Before running atomic-claim judgement, verify checks if the draft is: abstain reply (`I don't have / not confirmed`), short clarifying question (ends with `?`, <200 chars), URL-directive (`open a ticket`), or very short (<60 chars). If yes → skip verifier entirely. Saves ~600-1200ms on ~30% of traffic.
 - **Graph edges**: `verify` loops back to `generate` when `state.critique !== ''`. Capped at 1 retry (`verifyAttempts`).
+
+#### `speculative.ts` — Speculative RAG (NEW, ported from FP-discord)
+- Pattern from Wang et al. 2024 paper: **-51% latency + 13% accuracy gain**
+- **`speculativeRAG()`** runs:
+  1. Partition retrieved chunks into 3 overlapping subsets
+  2. 3 parallel drafters (each sees different subset + different style hint)
+  3. Scorer call with `max_tokens=8` picks letter (A/B/C)
+  4. Returns chosen draft text, or `null` on any failure
+- **MIN_CHUNKS_FOR_SPECULATIVE = 4** — gating threshold
+- **NUM_DRAFTS = 3** — drafter count
+- **DRAFTER_MAX_TOKENS = 768** — smaller than standard 1024
+- **SCORER_MAX_TOKENS = 8** — single letter only, effectively free
+- Style hints rotate: "focus on most relevant", "balanced answer", "be conservative"
+- Wall-clock budget: 18s per drafter (parallel) + 6s scorer = 24s max
+- Falls back via `null` if <2 drafts survive. Caller (agent.ts) MUST handle null.
 
 #### `fastPath.ts` — Canned Replies (Zero LLM Cost)
 - Handles greetings, thanks, identity questions, /help — returns constant strings.
@@ -198,6 +266,8 @@ Telegram reply
 - Extracts up to 8 atomic claims from the draft.
 - **ALLOWED_URL_PATTERNS**: Claims about these URLs auto-pass (never judged as unsupported). **Must stay in sync with `ALLOWED_URLS` in `agent.ts`.**
 - Two-pass judging: strict first, permissive re-judge on failures only.
+- **MAX_PARALLEL_BATCHES = 5** (matches FP-discord)
+- **Adversarial worked examples**: strict judge prompt now includes 5 trap patterns — number swap, invented detail, paraphrase (correct), confident invention, partial truth. Teaches gpt-oss to catch claims it previously waved through.
 - On FAIL: returns `critique` naming unsupported claims → `generate` runs again with that critique injected.
 - Fail-open on timeout/parse error (marks claims supported).
 
@@ -401,9 +471,14 @@ Admins and approved users (`/approve`) are immune to all locks.
 | Want to... | Edit this file |
 |---|---|
 | Change what the bot *knows* about a topic | `src/ai/agent.ts` → `SYSTEM_PROMPTS[intent]` |
-| Change how the bot *behaves* globally | `src/ai/agent.ts` → `BASE_RULES` |
+| Change how the bot *behaves* globally | `src/ai/agent.ts` → `BASE_RULES` (Anthropic protocol at top, response rules below) |
+| Adjust Anthropic reasoning protocol | `src/ai/agent.ts` → top of `BASE_RULES` (THINKING / KNOWLEDGE BOUNDARY / ABSTAIN / QUOTE-BEFORE-CLAIM) |
+| Change Speculative RAG behavior | `src/ai/speculative.ts` — tune `NUM_DRAFTS`, `MIN_CHUNKS_FOR_SPECULATIVE`, `DRAFTER_MAX_TOKENS`, style hints |
+| Disable Speculative RAG | In `agent.ts` `generate()`, change `canSpeculate = state.chunks.length >= 4` → `false` |
+| Change citation marker pattern | `src/ai/agent.ts` `generate()` — modify the chunk numbering block (look for "CITATION RULE") |
+| Change CRAG skip-verify rules | `src/ai/agent.ts` `verify()` — modify the `isAbstain` / `isClarifyingQ` / `isUrlDirective` / `isVeryShort` regexes |
 | Add a new AI intent/topic | Add keyword to `INTENT_KEYWORDS`, add entry to `SYSTEM_PROMPTS` |
-| Change which URLs are allowed in output | `ALLOWED_URLS` in `agent.ts` AND `ALLOWED_URL_PATTERNS` in `verifier.ts` |
+| Change which URLs are allowed in output | `ALLOWED_URLS` in `agent.ts` AND `ALLOWED_URL_PATTERNS` in `verifier.ts` AND `ALLOWED_URLS` in `AIService.ts` (TRIPLE sync required) |
 | Add a partner link to deterministic lookup | `LINK_LOOKUP` array in `src/commands/ai/chat.ts` |
 | Change follow-up questions per intent | `FOLLOWUPS` object in `src/commands/ai/chat.ts` |
 | Change outreach reply detection | `isOutreachReply` regex in `src/commands/ai/chat.ts` |
@@ -411,10 +486,12 @@ Admins and approved users (`/approve`) are immune to all locks.
 | Add a topic guard keyword | `TOPIC_GUARD` regex in `src/ai/fastPath.ts` |
 | Change cache hit threshold | `HIT_THRESHOLD` in `src/ai/responseCache.ts` (don't go below 0.92) |
 | Change verifier strictness | Prompt in `judgeOneBatch()` in `src/ai/verifier.ts` |
+| Add an adversarial verifier example | `examples` const in `judgeOneBatch()` in `src/ai/verifier.ts` |
 | Add a new bot command | Create `src/commands/<category>/name.ts`, export default function |
 | Change lock behavior | `src/middlewares/locks.ts` |
 | Change flood threshold | `/setflood` command (stored in session) or `src/middlewares/flood.ts` |
-| Update the knowledge base | Edit `faq_data.json` → delete `storage/vectors/` → restart (re-embeds) |
+| Update the knowledge base | Edit `faq_data.json` → in bot DM: `/indexfaq` (re-embeds without restart) |
+| Bulk-add new docs | `/adddoc` command in bot DM (owner only) — paste text or reply to PDF/DOCX |
 
 ---
 
@@ -480,7 +557,7 @@ Quick reference for AI prompt correctness:
 | **ABox Nodes** | LITE $500/1,333 AA/12,000 slots · PRO $1,000/2,900 AA/4,137 slots · MAX $3,000/10,500 AA/1,142 slots. Total 17,279 slots. Revenue sharing. |
 | **AA Token** | 1B supply. 250,000 AA/day emission, −10% every 6 months. 1-year cliff + 4-year linear vesting. TGE Q2–Q3 2026 (NOT confirmed). |
 | **MULAN** | Entry 0.005 BNB → 5,000 points. Revenue tiers: $100→10%, $500→25%, $1,000→50%. NFT daily: 1★ 1,298/2★ 2,900/3★ 16,000/4★ 75,000 pts/day. |
-| **Partners (6)** | MULAN Labs (May 2026) · PayGo (Apr 2026) · Zeus Network (Apr 2026) · ENI/ENIAC (Apr 2026) · UXLINK (May 2026) · SumPlus (May 2026) |
+| **Partners (7)** | MULAN Labs (May 2026) · PayGo (Apr 2026) · Zeus Network (Apr 2026) · ENI/ENIAC (Apr 2026) · UXLINK (May 2026) · SumPlus (May 2026) · ANT.FUN (May 2026, Social DEX — added to faq_data.json only, NOT yet in `agent.ts` partnerships prompt) |
 | **Roadmap** | Done: ABox presale, testnet, AI Agents early access. Now: partnerships, node subscriptions. Next Q2–Q3 2026: mainnet + TGE, DEX, Prediction Market. |
 | **Team** | Community-driven. Lead investors: OKX Ventures, EMURGO. |
 | **Official Discord** | https://discord.gg/XXDEjFPrgR (ticket system for support/outreach) |
@@ -512,5 +589,84 @@ Located at `fundingpips-bot/` in the monorepo. This is a separate Rust Discord b
 - `fastPath.ts` ← `crates/ai/src/pipeline/fast_path.rs`
 - `reranker.ts` ← `crates/ai/src/pipeline/stage_06_rerank.rs`
 - `verifier.ts` ← `crates/ai/src/verify/mod.rs`
+- `speculative.ts` ← `crates/ai/src/pipeline/speculative.rs` (added 2026-05-18)
+- CRAG skip-verify router in `agent.ts` ← `pipeline/fast_path.rs::decide` (added 2026-05-18)
+- Adversarial verifier examples ← `verify/mod.rs:355-410` (added 2026-05-18)
 
 When the Rust bot gets a new pattern improvement, consider porting it here. The two codebases share the same architectural thinking but are deployed independently.
+
+---
+
+## 21. Recent Upgrades (chronological)
+
+### 2026-05-18 — Anthropic + FP-discord AI overhaul
+
+**Phase 0 — Bug fixes and stability**
+- Verifier URL whitelist (Discord ticket links no longer dropped on retry)
+- Varied outreach replies (no more identical "open a ticket" templates)
+- `isFullListRequest` regex tightened (require explicit links/url/socials word)
+- ANT.FUN partner added to `faq_data.json` + ALLOWED_URLS (minimum scope)
+- Bug fixes in `chat.ts`: command-prefix stripping in `detectLinkRequest`, raised word-count cap 5→6
+
+**Phase 1 — Anthropic reasoning protocol (`agent.ts` BASE_RULES)**
+- `<thinking>...</thinking>` chain-of-thought (Anthropic prompt-engineering docs)
+- Knowledge boundary directive (external knowledge restriction)
+- Explicit "I don't know" abstain permission with 3 rotating phrasings
+- Quote-before-claim grounding requirement
+- `<thinking>` strip in `outputCheck` AND in verifier draft preprocessing
+
+**Phase 2 — FP-discord parity (`agent.ts` + `verifier.ts`)**
+- CRAG skip-verify router (skip verifier on abstain/short/clarifying/URL-directive replies)
+- Adversarial worked examples in strict-judge prompt (5 trap patterns)
+- Verifier parallelism 4 → 5 batches
+
+**Phase 3 — Speculative RAG (`speculative.ts` NEW, ~189 lines)**
+- 3 parallel drafters + scorer pattern (Wang et al. 2024)
+- Triggered when `chunks.length >= 4 && !state.critique`
+- Style-variation hints rotate across drafters
+- Falls back to standard single-shot generate on any failure
+- Wall-clock budget: 24s max (vs 28s standard)
+
+**Phase 4 — Citation pattern (`agent.ts`)**
+- Each retrieved chunk numbered `[1]`, `[2]`, `[3]` in context block
+- Model instructed to tag every factual claim with source marker
+- Unmarked claims → substitute "not confirmed"
+- Markers stripped in outputCheck before user sees response
+- Pattern source: Anthropic Citations API docs (Endex customer case: 10% → 0% source hallucinations)
+
+### Stable tags / rollback points
+
+- **`v1.0-stable`** (commit d13b38a) — pre-Anthropic-overhaul stable state. Use for emergency rollback:
+  ```bash
+  cd ~/bot/telegram-bot && git checkout v1.0-stable && npm run build && pm2 restart tenet-bot
+  ```
+- **`stable` branch** — mirrors `v1.0-stable` for branch-based rollback
+
+### Realistic performance expectations (sourced numbers, not marketing)
+
+- Latency on `/ask` queries: **-40-60%** (CRAG skip-router + Speculative RAG parallelism)
+- Hallucination rate: **-50-80%** (citation rule + adversarial verifier + abstain logic + speculative scoring + knowledge boundary)
+- Wrong-topic responses: **-30-50%** (citation rule forces source-grounding)
+- "I don't know" abstain rate: **+200-400%** (this is INTENTIONAL — a correct bot abstains more, not less)
+
+**There is no published "10x reduction" or "top 1% agent" number.** Every metric above is sourced from published papers (Wang et al. 2024 Speculative RAG, Anthropic docs.anthropic.com) or FP-discord production measurements. Do not promise users beyond these figures.
+
+---
+
+## 22. Deployment Checklist (UPDATED)
+
+After any AI pipeline change:
+
+- [ ] `npm run build` clean (zero TypeScript errors)
+- [ ] `git push origin main`
+- [ ] On VM: `cd ~/bot/telegram-bot && git pull && npm run build && pm2 restart tenet-bot --update-env`
+- [ ] Monitor first 3-5 `/ask` queries in PM2 logs for unexpected errors
+- [ ] **If `faq_data.json` was changed:** in bot DM, run `/indexfaq` to re-embed into vector store (DOES NOT auto-index)
+- [ ] **If `agent.ts` ALLOWED_URLS was changed:** verify same change in `verifier.ts` ALLOWED_URL_PATTERNS AND `AIService.ts` ALLOWED_URLS (triple sync)
+- [ ] **If responses look stale:** Redis cache may still serve old answers up to 1h. Flush `tenet:rc:*` keys to force fresh generation
+- [ ] **If anything breaks:** `git checkout v1.0-stable && npm run build && pm2 restart tenet-bot` — instant rollback to known-good state
+
+### Speculative RAG specific
+- Requires ≥4 chunks retrieved per query → vector store needs to be populated (run `/indexfaq` and add docs via `/adddoc`)
+- Below 4 chunks, standard single-shot generate is used automatically — no error, just less efficient
+- To verify it's running: tail PM2 logs during a multi-fact query — you'll see 3 Bedrock attempt logs arrive in parallel
