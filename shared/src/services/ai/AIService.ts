@@ -109,7 +109,7 @@ const INTENT_KEYWORDS: Record<string, string[]> = {
   nodes:        ['node', 'lite tier', 'pro tier', 'max tier', 'abox', 'slot', 'compute node', 'hardware node'],
   token:        [' aa ', 'token', 'tokenomics', 'tge', 'supply', 'vesting', 'emission', 'airdrop', 'allocation'],
   mulan:        ['mulan', 'point', 'nft', 'star', 'referral', 'bnb', 'redeem'],
-  partnerships: ['partner', 'paygo', 'zeus', 'eni', 'eniac', 'zbtc', 'collaboration', 'uxlink', 'mulan labs', 'sumplus', 'mcp', 'defi data'],
+  partnerships: ['partner', 'paygo', 'zeus', 'eni', 'eniac', 'zbtc', 'collaboration', 'uxlink', 'mulan labs', 'sumplus', 'mcp', 'defi data', 'ant.fun', 'ant fun', 'ant_fun', 'social dex'],
   roadmap:      ['roadmap', 'timeline', 'launch', 'mainnet', 'q2', 'q3', '2026', 'phase', 'milestone'],
   team:         ['team', 'investor', 'okx', 'emurgo', 'advisor', 'founder', 'backed'],
   developers:   ['developer', 'sdk', 'api', 'framework', 'build', 'grant'],
@@ -138,13 +138,14 @@ CRITICAL: The 30% is the size of the token POOL reserved for MULAN holders — N
 Node Revenue Tiers: $100→10% · $500→25% · $1,000→50% trading fee revenue share. Senior Partner: $3,000 → top-level partner + MULAN node worth $1,000.`,
 
   partnerships: `## Partnerships Expert Knowledge
-6 active partners: MULAN Labs · PayGo · Zeus Network · ENI/ENIAC · UXLINK · SumPlus.
+7 active partners: MULAN Labs · PayGo · Zeus Network · ENI/ENIAC · UXLINK · SumPlus · ANT.FUN.
 MULAN Labs (May 2026): Referral/traffic platform. MULAN point holders get AA airdrops + NFT rewards + node fee sharing. https://mulan.meme
 PayGo (April 2026): AI-native x402 payment protocol — AI agents pay each other autonomously. https://www.paygo.ac
 Zeus Network (April 2026): Bitcoin liquidity via zBTC (1:1 BTC-pegged), cross-chain BTC into Astarter. https://zeusnetwork.xyz
 ENI/ENIAC Network (April 2026): Enterprise modular L1, cross-chain DeFi + co-incubation. https://eniac.network
 UXLINK (May 2026): Leading Web3 social platform — connects global users, communities and builders. Partnership goal: integrate Astarter's AI-native infrastructure with UXLINK's social ecosystem to accelerate Web3 participation, autonomous coordination and on-chain growth. https://x.com/UXLINKofficial
-SumPlus (May 2026): DeFi real-time data layer — gives Astarter AI Agents one-click access via MCP to TVL, protocol indicators, heterogeneous chain ecology and cross-chain panoramic analysis. The "data vision" layer complementing Astarter's on-chain execution. https://www.sumplus.xyz`,
+SumPlus (May 2026): DeFi real-time data layer — gives Astarter AI Agents one-click access via MCP to TVL, protocol indicators, heterogeneous chain ecology and cross-chain panoramic analysis. The "data vision" layer complementing Astarter's on-chain execution. https://www.sumplus.xyz
+ANT.FUN (May 2026): Next-generation Social DEX with ultra-low-rate trading and AI intelligent trading tools. Tagline: "Trade Fast, Own True". Partnership combines Astarter's AI-native DeFAI infrastructure and autonomous AI Agent execution with ANT.FUN's social DEX — creating a more intelligent, efficient and social-attributed on-chain trading and pledge ecosystem. Theme: "Launch · Meets · Social Trading". https://ant.fun | https://x.com/ant_fun_trade`,
 
   roadmap: `## Roadmap Expert Knowledge
 2025 Q3–Q4 (COMPLETE): ABox presale, testnet, AI Agents early access.
@@ -208,6 +209,9 @@ const ALLOWED_URLS = new Set([
   'https://linktr.ee/uxlink_official',
   // Partner links — SumPlus
   'https://www.sumplus.xyz',
+  // Partner links — ANT.FUN
+  'https://ant.fun',
+  'https://x.com/ant_fun_trade',
 ]);
 
 
@@ -539,6 +543,7 @@ Partner links (ONLY when user explicitly asks for a partner's link):
 • MULAN / Mulan Labs → https://mulan.meme
 • UXLINK → https://x.com/UXLINKofficial
 • SumPlus → https://www.sumplus.xyz
+• ANT.FUN → https://ant.fun
 
 Link rules:
 • Share a link ONLY when the user explicitly asks for it ("give me the link", "what's the URL", "where can I find it").

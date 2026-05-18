@@ -2,7 +2,7 @@
 
 Last updated: May 2026
 
-Astarter has 6 active partnerships. Add new ones below when announced.
+Astarter has 7 active partnerships. Add new ones below when announced.
 
 ---
 
@@ -51,6 +51,16 @@ Astarter has 6 active partnerships. Add new ones below when announced.
 - **What they do:** DeFi real-time data layer — provides top authoritative DeFi data (TVL, protocol core indicators, heterogeneous chain ecology, cross-chain panoramic analysis) accessible via MCP (Model Context Protocol).
 - **Integration with Astarter:** Astarter AI Agents can call SumPlus DeFi data with one click through MCP. SumPlus delivers the "data vision" layer that complements Astarter's "on-chain execution ability," enabling autonomous agents to monitor and act on-chain 24/7. Positioned as DeFi Data Layer × AI Agent Execution Layer × Astarter — the DePIN/DeFAI bottom layer of the Web4 decentralized financial OS.
 - **Links:** https://www.sumplus.xyz
+
+---
+
+## ANT.FUN
+- **Announced:** May 2026
+- **Tagline:** "Trade Fast, Own True"
+- **What they do:** Next-generation Social DEX with ultra-low-rate on-chain trading and AI intelligent trading tools. Social-attributed market mechanics for the next stage of DeFi × AI Agent × Social.
+- **Integration with Astarter:** Combines Astarter's AI-native DeFAI infrastructure and autonomous AI Agent execution ability with ANT.FUN's ultra-low-rate social DEX and AI intelligent trading tools — creating a more intelligent, efficient and social-attributed on-chain trading and pledge ecosystem.
+- **Theme:** Launch · Meets · Social Trading
+- **Links:** https://ant.fun | Twitter: https://x.com/ant_fun_trade
 
 ---
 
