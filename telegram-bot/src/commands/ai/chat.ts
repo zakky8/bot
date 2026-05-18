@@ -56,55 +56,10 @@ const LINK_LOOKUP: Array<{ keywords: string[]; url: string; label: string }> = [
     url: 'https://linktr.ee/Astarter', label: 'All Official Links' },
 ];
 
-// ── Full official links list (deterministic, instant, no LLM call) ───────────
-// Returned when user asks for a LIST of all links (not just the linktree shortcut).
-const ALL_LINKS_FORMATTED =
-  '<b>🌐 Astarter Official Links</b>\n\n' +
-  '• <b>Website</b> — https://app.astarter.io\n' +
-  '• <b>Docs / Gitbook</b> — https://astarter.gitbook.io/astarter\n' +
-  '• <b>Telegram Community</b> — https://t.me/AstarterDefiHubOfficial\n' +
-  '• <b>Telegram Announcements</b> — https://t.me/Astarteranncmnt\n' +
-  '• <b>Twitter / X</b> — https://x.com/AstarterDefiHub\n' +
-  '• <b>Discord</b> — https://discord.gg/XXDEjFPrgR\n' +
-  '• <b>Medium</b> — https://medium.com/@AstarterDefiHub\n' +
-  '• <b>Reddit</b> — https://www.reddit.com/r/Astarter/\n' +
-  '• <b>YouTube</b> — https://youtube.com/c/astartertv\n' +
-  '• <b>Zealy</b> — https://zealy.io/cw/astarterdefihub/leaderboard\n' +
-  '• <b>All-in-one</b> — https://linktr.ee/Astarter\n\n' +
-  '<b>🤝 Partner Links</b>\n' +
-  '• MULAN Labs — https://mulan.meme\n' +
-  '• PayGo — https://www.paygo.ac\n' +
-  '• Zeus Network — https://zeusnetwork.xyz\n' +
-  '• ENI / ENIAC — https://eniac.network\n' +
-  '• UXLINK — https://uxlink.io\n' +
-  '• SumPlus — https://www.sumplus.xyz\n' +
-  '• ANT.FUN — https://ant.fun';
-
-// Detects "give me ALL links as a list" intent (different from "give me linktree")
-function isFullListRequest(lower: string): boolean {
-  // Trigger words that mean "show me each one" — not just "give me the linktree"
-  const listWords  = /\b(list|one by one|each|every|all of them|enumerate|show all|show me all|complete list)\b/.test(lower);
-  // "X and all other" / "X and others" / "X and the rest" — user wants more than just X
-  const andOthers  = /\b(and\s+(all\s+)?(other|others|the\s+rest|more))\b/.test(lower);
-  // Russian: список (list), по одной/одному (one by one), все (all), каждый (each)
-  const listWordsRu = /(список|по одной|по одному|все ссылки|каждый|каждую)/.test(lower);
-  const hasLinkWord = /\b(link|url|website|site|social|channel)\b/.test(lower) ||
-                      /(ссылк|сайт|соцсет|канал)/.test(lower);
-  return ((listWords || listWordsRu || andOthers) && hasLinkWord) ||
-         // bare "and all other" patterns (e.g. "website and all other") imply user
-         // wants the full list even if "link" isn't in the message
-         /\b\w+\s+and\s+all\s+other\b/.test(lower);
-}
-
 // Returns a match only when the message is clearly asking FOR a specific link —
 // not when the user is asking ABOUT something that mentions a platform name.
-function detectLinkRequest(message: string): { url: string; label: string; fullList?: boolean } | null {
+function detectLinkRequest(message: string): { url: string; label: string } | null {
   const lower = message.toLowerCase().trim();
-
-  // PRIORITY: full-list request returns the entire formatted list, not just linktree
-  if (isFullListRequest(lower)) {
-    return { url: '', label: 'All Official Links', fullList: true };
-  }
 
   // Must contain a link-intent signal — either an explicit request word or be very short (≤5 words)
   const wordCount = lower.split(/\s+/).length;
@@ -290,11 +245,7 @@ export default (bot: Bot<BotContext>) => {
       // ── Deterministic link lookup — instant, no streaming needed ────────────
       const linkMatch = detectLinkRequest(message);
       if (linkMatch) {
-        if (linkMatch.fullList) {
-          await ctx.reply(ALL_LINKS_FORMATTED, replyOpts);
-        } else {
-          await ctx.reply(`Here's the Astarter <b>${linkMatch.label}</b>:\n${linkMatch.url}`, replyOpts);
-        }
+        await ctx.reply(`Here's the Astarter <b>${linkMatch.label}</b>:\n${linkMatch.url}`, replyOpts);
         return;
       }
 
