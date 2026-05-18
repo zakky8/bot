@@ -366,10 +366,17 @@ export default (bot: Bot<BotContext>) => {
       const followUp = FOLLOWUPS[result.intent];
       const alreadyHasQuestion = /\?\s*(<\/[a-z]+>)?\s*$/.test(text.trim());
       const hasChannelRefFinal  = text.includes('announcements channel') || text.includes(ANN_URL);
-      // Suppress follow-up when bot directed user to Discord ticket — that IS the answer,
-      // no need to append "Want details on any specific partner?" after it.
-      const hasDiscordTicket    = text.includes('discord.gg') && text.toLowerCase().includes('ticket');
-      if (followUp && !alreadyHasQuestion && !hasChannelRefFinal && !hasDiscordTicket && result.intent !== 'links') {
+      // Suppress follow-up when the bot's reply IS an outreach/contact directive.
+      // Old check (discord.gg AND ticket) only caught the exact prompt example;
+      // the model often varies the wording ("official communication channels",
+      // "official support channel", "reach the team"), so we match all those too.
+      const isOutreachReply =
+        /open a (support )?ticket/i.test(text) ||
+        /official (communication|support) (channel|channels)/i.test(text) ||
+        /(reach|contact) the (astarter )?team/i.test(text) ||
+        /astarter discord/i.test(text) ||
+        /to discuss .{0,40}(opportunit|collaborat|partnership|promotion|advertis)/i.test(text);
+      if (followUp && !alreadyHasQuestion && !hasChannelRefFinal && !isOutreachReply && result.intent !== 'links') {
         text = text.trimEnd() + '\n\n' + followUp;
       }
 
