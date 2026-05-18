@@ -37,6 +37,47 @@ const EXTRACTION_TIMEOUT_MS = 6000;
 const JUDGE_TIMEOUT_MS = 5000;
 const MAX_CLAIMS = 8; // cap to keep verify budget bounded
 
+// URLs the bot is allowed to output. Claims mentioning these are pre-marked as
+// supported (they're official Astarter/partner links — judging them as "unsupported
+// by sources" causes the generator to drop the URL on retry, leaving users without
+// the Discord ticket / website link in outreach responses).
+// MUST stay in sync with ALLOWED_URLS in agent.ts and shared/.../AIService.ts.
+const ALLOWED_URL_PATTERNS = [
+  'discord.gg/XXDEjFPrgR',
+  'discord.gg/zeusnetwork',
+  'app.astarter.io',
+  'astarter.gitbook.io',
+  't.me/AstarterDefiHubOfficial',
+  't.me/Astarteranncmnt',
+  't.me/Paygo_eni',
+  't.me/ENI_Channel',
+  't.me/ENI_Community',
+  'x.com/AstarterDefiHub',
+  'x.com/PayGo402',
+  'x.com/ZeusNetworkHQ',
+  'x.com/ENI__Official',
+  'x.com/UXLINKofficial',
+  'twitter.com/AstarterDefiHub',
+  'medium.com/@AstarterDefiHub',
+  'reddit.com/r/Astarter',
+  'youtube.com/c/astartertv',
+  'zealy.io/cw/astarterdefihub',
+  'linktr.ee/Astarter',
+  'linktr.ee/uxlink_official',
+  'mulan.meme',
+  'paygo.ac',
+  'zeusnetwork.xyz',
+  'eniac.network',
+  'docs.eniac.network',
+  'uxlink.io',
+  'sumplus.xyz',
+];
+
+function isClaimAboutAllowedUrl(claim: string): boolean {
+  const lower = claim.toLowerCase();
+  return ALLOWED_URL_PATTERNS.some(url => lower.includes(url.toLowerCase()));
+}
+
 export interface ClaimVerdict {
   claim: string;
   supported: boolean;
@@ -64,20 +105,37 @@ export async function verifyDraft(
   draft: string,
 ): Promise<VerifyResult> {
   // 1. Decompose draft → claims
-  const claims = await extractClaims(draft);
-  if (claims.length === 0) {
+  const allClaims = await extractClaims(draft);
+  if (allClaims.length === 0) {
     // No factual claims found — pure conversational filler or clarifying
     // question. Ship as-is.
     return { pass: true, critique: '', verdicts: [] };
   }
 
-  // 2. Strict judge in batched parallel
-  const strictVerdicts = await judgeBatched(sources, claims, /*permissive=*/ false);
+  // 1b. Partition: claims mentioning allowlisted URLs are pre-marked SUPPORTED
+  // (they're official Astarter links — judging them as "unsupported" causes
+  // the generator to drop the URL on retry, leaving outreach replies without
+  // the Discord ticket / website link).
+  const urlClaims      = allClaims.filter(isClaimAboutAllowedUrl);
+  const claimsToJudge  = allClaims.filter(c => !isClaimAboutAllowedUrl(c));
+  const urlVerdicts: ClaimVerdict[] = urlClaims.map(claim => ({
+    claim,
+    supported: true,
+    reason: '',
+  }));
+
+  // If every claim is just an allowed URL, skip the judge entirely
+  if (claimsToJudge.length === 0) {
+    return { pass: true, critique: '', verdicts: urlVerdicts };
+  }
+
+  // 2. Strict judge in batched parallel — only non-URL claims
+  const strictVerdicts = await judgeBatched(sources, claimsToJudge, /*permissive=*/ false);
 
   // 3. Permissive re-judge of FAILed claims only
   const strictFails = strictVerdicts.filter(v => !v.supported);
   if (strictFails.length === 0) {
-    return { pass: true, critique: '', verdicts: strictVerdicts };
+    return { pass: true, critique: '', verdicts: [...strictVerdicts, ...urlVerdicts] };
   }
 
   const permissiveVerdicts = await judgeBatched(
@@ -96,6 +154,8 @@ export async function verifyDraft(
     }
     return strict;
   });
+  // Add URL verdicts back into the merged list
+  merged.push(...urlVerdicts);
 
   const stillFailed = merged.filter(v => !v.supported);
   if (stillFailed.length === 0) {
