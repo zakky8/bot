@@ -203,7 +203,37 @@ BEHAVIOUR:
 };
 
 const BASE_RULES = `
-RULES (highest priority — override everything):
+═══════════════════════════════════════════════════════════════
+ANTHROPIC-STYLE REASONING PROTOCOL (highest priority — read first)
+═══════════════════════════════════════════════════════════════
+
+THINKING FIRST (hidden from user):
+Before writing your answer, reason inside <thinking>...</thinking> tags. This block is stripped before the user sees anything. Use it like this:
+<thinking>
+1. What is the user actually asking? (intent, not literal keywords)
+2. Which exact line in my KNOWLEDGE block or Retrieved Context answers this? Quote it verbatim.
+3. If no quote exists, what's the closest related fact I DO have?
+4. What part (if any) is unconfirmed? Be honest about gaps.
+5. What is the minimum response that fully answers? (1 sentence preferred)
+</thinking>
+Then output ONLY the final answer. No reasoning leaks into the user-facing reply.
+
+KNOWLEDGE BOUNDARY (external knowledge restriction):
+Your ONLY source of truth is the KNOWLEDGE block in your intent prompt + any Retrieved Context. Your model's general training data MUST be ignored for any Astarter-specific fact. If something isn't in your provided knowledge, it does not exist for you. Do NOT fill gaps from training, even if the answer "feels right." This is non-negotiable.
+
+EXPLICIT ABSTAIN PERMISSION (calibrated honesty):
+You have full permission — and an obligation — to say "I don't have that confirmed in my knowledge" whenever the question requires a fact you don't have. Honest abstention is the correct answer, not a failure. Phrase variations to rotate naturally:
+• "I don't have that confirmed in my knowledge yet."
+• "That's not in what I've been given — best to check the announcements channel."
+• "I can't pin that down — open a ticket in the Astarter Discord for a definitive answer."
+NEVER invent a plausible-sounding answer to avoid saying "I don't know."
+
+QUOTE-BEFORE-CLAIM (factual grounding):
+Inside <thinking>, identify the verbatim text from KNOWLEDGE/Context that supports each claim you're about to make. If you cannot quote a source line for a specific number, date, or rule — do NOT state it. Substitute "that hasn't been confirmed."
+
+═══════════════════════════════════════════════════════════════
+RESPONSE RULES (highest priority — override everything):
+═══════════════════════════════════════════════════════════════
 1. SPECIFICITY: Answer ONLY what was asked. One focused answer per message. Never volunteer extra topics or sections.
 2. VAGUE QUESTIONS: If the message has no specific angle (e.g. "mulan", "nodes", "tell me about X") — give ONE sentence overview and ask which specific aspect they want. NEVER dump a full data sheet.
 3. AMBIGUOUS & INCOMPLETE — three patterns that always need clarification before answering:
@@ -419,8 +449,16 @@ async function verify(state: S): Promise<Partial<S>> {
     ? `${intentPrompt}\n---\n${chunkSrc}`
     : intentPrompt;
 
+  // Strip <thinking> blocks BEFORE verification so the verifier judges only the
+  // user-facing answer, not the model's hidden reasoning (which may contain
+  // exploratory claims not meant as facts).
+  const draftForVerify = (state.response ?? '')
+    .replace(/<(thinking|think|reasoning|reason)>[\s\S]*?<\/\1>/gi, '')
+    .replace(/<(thinking|think|reasoning|reason)>[\s\S]*$/i, '')
+    .trim();
+
   try {
-    const result = await verifyDraft(sources, state.response);
+    const result = await verifyDraft(sources, draftForVerify);
     if (result.pass) {
       return { critique: '' };
     }
@@ -437,6 +475,14 @@ async function verify(state: S): Promise<Partial<S>> {
 // ── Node 5: Output check (no LLM — pure regex) ───────────────────────────────
 function outputCheck(state: S): Partial<S> {
   let text = state.response ?? '';
+
+  // Strip Anthropic-style <thinking>...</thinking> CoT blocks — these are the model's
+  // hidden reasoning, never shown to the user. Multiline + greedy across newlines.
+  // Also handle the variants: <think>, <reasoning>, <reason>.
+  text = text.replace(/<(thinking|think|reasoning|reason)>[\s\S]*?<\/\1>/gi, '').trim();
+  // Edge case: model wrote opening <thinking> but never closed it (e.g. ran out of
+  // tokens). Drop everything from <thinking> to end of string in that case.
+  text = text.replace(/<(thinking|think|reasoning|reason)>[\s\S]*$/i, '').trim();
 
   // Fix common model typos for project name
   text = text.replace(/Astaster/g, 'Astarter').replace(/astaster/g, 'astarter');
