@@ -187,6 +187,46 @@ After any change to AI behavior, test these in Telegram:
 | Editing `vector_db.json` directly | Use `/adddoc` instead — preserves embeddings |
 | Adding a new intent without `INTENT_KEYWORDS` keyword | Classifier falls to `general`, wrong prompt loads |
 | Putting facts only in faq_data.json | Agent doesn't read FAQ at runtime — facts must be in agent.ts SYSTEM_PROMPTS |
+| Pushing a fix but forgetting to deploy | `git push` ≠ deployed — must run `pm2 restart tenet-bot` on the VM |
+
+---
+
+## Link Lookup (chat.ts `detectLinkRequest`) — Subtle Behavior
+
+The link-lookup layer in `chat.ts` runs BEFORE the LangGraph agent and intercepts any message matching a link-intent keyword. This bypasses the AI entirely for known URLs.
+
+### Three distinct user intents — each must be handled differently:
+
+| User says | Should return |
+|---|---|
+| "discord", "discord link" | Just the Discord URL |
+| "all links", "linktree", "every link" | Just the linktree URL |
+| **"list of links", "one by one", "website and all other"** | **Full formatted list of ALL links + partners** |
+
+The third case is handled by `isFullListRequest()` (added in commit 9f646e2). DO NOT remove this function — without it, "give me a list" returns only the linktree URL, which users perceive as the bot being unhelpful.
+
+### Adding new link triggers
+
+1. New partner with a website → add to `LINK_LOOKUP` array (BEFORE the generic 'website' entry — order matters)
+2. New official social → add to the `LINK_LOOKUP` array
+3. New language variant of "all links" → add to the catch-all keyword list
+4. If you add a new partner link, ALSO add it to `ALL_LINKS_FORMATTED` constant so it appears in the full list
+
+### Mandatory test checklist after touching `detectLinkRequest` or `LINK_LOOKUP`:
+
+```
+/ask discord                            → just Discord URL
+/ask website                            → just Website URL
+/ask all astarter links                 → just linktree
+/ask astarter links list                → FULL formatted list (NOT just linktree)
+/ask website and all other              → FULL formatted list (NOT just website)
+/ask list of astarter official links    → FULL formatted list
+/ask one by one all links               → FULL formatted list
+/ask mulan website                      → just MULAN URL (partner-specific)
+/ask ant.fun website                    → just ant.fun URL (partner-specific)
+```
+
+If any of these regress, fix BEFORE merging.
 
 ---
 
