@@ -81,13 +81,15 @@ function detectLinkRequest(message: string): { url: string; label: string } | nu
 
   if (!hasLinkIntent) return null;
 
-  // ── HIGHEST PRIORITY: "list" / "all" / "every link" requests → ALWAYS return the
-  //   linktree. The model loves to dump every URL raw when asked for a "list".
-  //   Catch this BEFORE the per-platform keyword loop to prevent dump responses.
+  // ── "All links" / "every link" request → return linktree.
+  //   IMPORTANT: only fire when the phrase explicitly mentions LINKS/URLS.
+  //   Earlier version matched "list of" anywhere → caught "list of partners",
+  //   "list of node tiers" etc. and dumped linktree instead of the real answer.
+  //   Both halves of these regexes now REQUIRE the word link/url/socials.
   const isFullListRequest =
-    /\b(all|every|full|complete|entire)\b.*\blinks?\b/.test(lower) ||
-    /\blinks?\b.*\b(list|all)\b/.test(lower) ||
-    /\b(list of|give me all|show me all|list all)\b/.test(lower);
+    /\b(all|every|full|complete|entire)\b.{0,20}\b(links?|urls?|socials?)\b/.test(lower) ||
+    /\b(links?|urls?|socials?)\b.{0,20}\b(list|all|every)\b/.test(lower) ||
+    /\b(list|give me|show me)\b.{0,20}\b(links?|urls?|socials?)\b/.test(lower);
   if (isFullListRequest) {
     return { url: 'https://linktr.ee/Astarter', label: 'All Official Links' };
   }
