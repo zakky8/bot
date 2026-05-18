@@ -375,7 +375,16 @@ export default (bot: Bot<BotContext>) => {
         /official (communication|support) (channel|channels)/i.test(text) ||
         /(reach|contact) the (astarter )?team/i.test(text) ||
         /astarter discord/i.test(text) ||
-        /to discuss .{0,40}(opportunit|collaborat|partnership|promotion|advertis)/i.test(text);
+        /to discuss .{0,40}(opportunit|collaborat|partnership|promotion|advertis)/i.test(text) ||
+        /for (partnership|ama|promotion|collaboration|business|advertis|sponsor)/i.test(text);
+
+      // Hard guarantee: outreach replies MUST contain the Discord ticket URL.
+      // The model may omit it when varying phrasing — this safety net injects it.
+      const DISCORD_TICKET_URL = 'https://discord.gg/XXDEjFPrgR';
+      if (isOutreachReply && !text.includes('discord.gg')) {
+        text = text.trimEnd() + `\n\nOpen a ticket in the Astarter Discord — ${DISCORD_TICKET_URL}`;
+      }
+
       if (followUp && !alreadyHasQuestion && !hasChannelRefFinal && !isOutreachReply && result.intent !== 'links') {
         text = text.trimEnd() + '\n\n' + followUp;
       }
