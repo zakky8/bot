@@ -71,6 +71,8 @@ const ALLOWED_URL_PATTERNS = [
   'docs.eniac.network',
   'uxlink.io',
   'sumplus.xyz',
+  'ant.fun',
+  'x.com/ant_fun_trade',
 ];
 
 function isClaimAboutAllowedUrl(claim: string): boolean {

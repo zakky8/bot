@@ -208,6 +208,10 @@ const ALLOWED_URLS = new Set([
   'https://linktr.ee/uxlink_official',
   // Partner links — SumPlus
   'https://www.sumplus.xyz',
+  // Partner links — ANT.FUN (Social DEX, May 2026)
+  'https://x.com/ant_fun_trade',
+  'https://ant.fun',
+  'http://ant.fun',
 ]);
 
 
