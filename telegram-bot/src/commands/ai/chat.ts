@@ -88,14 +88,12 @@ function isFullListRequest(lower: string): boolean {
   const andOthers  = /\b(and\s+(all\s+)?(other|others|the\s+rest|more))\b/.test(lower);
   // Russian: список (list), по одной/одному (one by one), все (all), каждый (each)
   const listWordsRu = /(список|по одной|по одному|все ссылки|каждый|каждую)/.test(lower);
-  // Must match singular AND plural — "link" + "links", "website" + "websites", etc.
-  // (Bug fix: original \blink\b never matched "links" because \b requires non-word char after)
-  const hasLinkWord = /\b(links?|urls?|websites?|sites?|socials?|channels?|pages?|handles?|accounts?|addresses?|socials)\b/.test(lower) ||
-                      /(ссылк|сайт|соцсет|канал|страниц)/.test(lower);
+  const hasLinkWord = /\b(link|url|website|site|social|channel)\b/.test(lower) ||
+                      /(ссылк|сайт|соцсет|канал)/.test(lower);
   return ((listWords || listWordsRu || andOthers) && hasLinkWord) ||
          // bare "and all other" patterns (e.g. "website and all other") imply user
          // wants the full list even if "link" isn't in the message
-         /\b\w+\s+and\s+all\s+(other|others|more|the\s+rest)\b/.test(lower);
+         /\b\w+\s+and\s+all\s+other\b/.test(lower);
 }
 
 // Returns a match only when the message is clearly asking FOR a specific link —
