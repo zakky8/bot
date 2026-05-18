@@ -9,6 +9,9 @@
 
 import { StateGraph, Annotation, START, END, MemorySaver } from '@langchain/langgraph';
 import { aiService } from '../core/ai';
+import { tryCannedReply, cannedIntent } from './fastPath';
+import { verifyDraft } from './verifier';
+import { rerankChunks } from './reranker';
 
 const ANN = 'https://t.me/Astarteranncmnt';
 
@@ -234,9 +237,30 @@ const AgentState = Annotation.Root({
   verifyAttempts: Annotation<number>({ reducer: (_, u) => u, default: () => 0 }),
   // critique holds the verify node's feedback that the next generate call must address.
   critique:       Annotation<string>({ reducer: (_, u) => u, default: () => '' }),
+  // ── Fast-path canned-reply (Self-RAG) ──────────────────────────────────────
+  // When set, the graph short-circuits to outputCheck — no retrieve / no LLM call.
+  fastPathHit:    Annotation<boolean>({ reducer: (_, u) => u, default: () => false }),
 });
 
 type S = typeof AgentState.State;
+
+// ── Node 0: Fast-path canned-reply (Self-RAG) ─────────────────────────────────
+// Greetings / thanks / identity / help queries don't need retrieve+generate+verify.
+// Replies in ~50ms, no LLM call. Wraps the message in fastPathHit so the rest of
+// the graph short-circuits straight to outputCheck (which still runs URL guard
+// + history update).
+function fastPath(state: S): Partial<S> {
+  const canned = tryCannedReply(state.message);
+  if (!canned || !canned.kind) {
+    return { fastPathHit: false };
+  }
+  return {
+    fastPathHit: true,
+    intent: cannedIntent(canned.kind),
+    response: canned.text,
+    chunks: [],
+  };
+}
 
 // ── Node 1: Classify intent + sentiment — pure keyword matching, no LLM call ──
 const INTENT_KEYWORDS: Record<string, string[]> = {
@@ -282,7 +306,7 @@ function checkSentiment(state: S): Partial<S> {
   return { negativeCount: neg };
 }
 
-// ── Node 3: Retrieve relevant chunks ─────────────────────────────────────────
+// ── Node 3: Retrieve relevant chunks + LLM cross-encoder rerank ──────────────
 async function retrieve(state: S): Promise<Partial<S>> {
   try {
     const timeout = new Promise<never>((_, reject) =>
@@ -292,7 +316,20 @@ async function retrieve(state: S): Promise<Partial<S>> {
       aiService.searchDocs(state.message, 5, ['astarter_deck', 'manual']),
       timeout,
     ]);
-    return { chunks: raw.filter(c => c.score >= 0.32) };
+    const filtered = raw.filter(c => c.score >= 0.32);
+
+    // Cross-encoder LLM rerank: judges QUERY ↔ each chunk for true relevance
+    // (embedding similarity alone often shares vocabulary across topics).
+    // Best-effort — falls back to score-sort on any failure.
+    if (filtered.length >= 2) {
+      try {
+        const reranked = await rerankChunks(state.message, filtered);
+        return { chunks: reranked };
+      } catch {
+        return { chunks: filtered };
+      }
+    }
+    return { chunks: filtered };
   } catch {
     return { chunks: [] }; // skip RAG — still answers from system prompt knowledge
   }
@@ -341,10 +378,12 @@ async function generate(state: S): Promise<Partial<S>> {
   return { response };
 }
 
-// ── Node 5: Verify (Drafter-Critic loop) ─────────────────────────────────────
-// Single LLM call that checks whether the draft adds facts NOT in the retrieved
-// chunks or intent prompt knowledge. If it detects unsupported claims, it loops
-// back to generate with a critique. Capped at 1 retry — total max 2 generate calls.
+// ── Node 5: Atomic-claim multi-judge verifier (Bayesian-RAG, Decagon-style) ──
+// Decomposes the draft into atomic factual claims, then judges each one against
+// the SOURCES in batched parallel. A strict pass first, then a permissive
+// re-judge of only the FAILed claims (catches false-negative refusals where the
+// claim IS supported but phrased differently). On verdict FAIL, loops back to
+// generate with a named-claim critique. Capped at 1 retry — max 2 generate calls.
 async function verify(state: S): Promise<Partial<S>> {
   // Cap retries — second pass always ships even if verify still complains.
   if ((state.verifyAttempts ?? 0) >= 1) {
@@ -366,38 +405,16 @@ async function verify(state: S): Promise<Partial<S>> {
     ? `${intentPrompt}\n---\n${chunkSrc}`
     : intentPrompt;
 
-  const critSystem = `You are a strict factual verifier for an Astarter community bot.
-Given the SOURCES and the DRAFT, reply in this exact format on ONE LINE:
-PASS
-or
-FAIL: <one short sentence naming the unsupported claim>
-
-Rules:
-- PASS only if every factual claim in the DRAFT is supported by the SOURCES, OR is a clarifying question / greeting / generic conversational filler.
-- FAIL if the DRAFT states ANY specific feature, change, update, numbers, dates, prices, names, or relationships that are NOT explicitly in the SOURCES.
-- Examples of FAIL: "performance improvements", "new features added", "expands utilities", "introduces tweaks", "added support for X" — these are vague invented updates unless SOURCES say so.
-- Do NOT critique style, length, or tone. Only factual support.
-- Reply with at most 200 characters total.`;
-
-  const critUser = `SOURCES:\n${sources}\n\nDRAFT:\n${state.response}`;
-
   try {
-    const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('verify timeout')), 8000)
-    );
-    const verdict = await Promise.race([aiService.quickChat(critSystem, critUser, 80), timeout]);
-    const v = verdict.trim();
-
-    if (/^FAIL/i.test(v)) {
-      // Strip "FAIL:" prefix, pass critique to next generate
-      const critique = v.replace(/^FAIL\s*:?\s*/i, '').trim();
-      return {
-        critique,
-        verifyAttempts: (state.verifyAttempts ?? 0) + 1,
-        response: '', // clear so generate runs again
-      };
+    const result = await verifyDraft(sources, state.response);
+    if (result.pass) {
+      return { critique: '' };
     }
-    return { critique: '' }; // PASS — ship as-is
+    return {
+      critique: result.critique,
+      verifyAttempts: (state.verifyAttempts ?? 0) + 1,
+      response: '', // clear so generate runs again
+    };
   } catch {
     return { critique: '' }; // verifier broke — fall through, ship draft
   }
@@ -450,21 +467,36 @@ function outputCheck(state: S): Partial<S> {
 }
 
 // ── Graph assembly ────────────────────────────────────────────────────────────
-// classify → checkSentiment → retrieve → generate → verify
-//                                         ↑          │
-//                                         └──[FAIL]──┘
-//                                                    │
-//                                                  [PASS]
-//                                                    ↓
-//                                                outputCheck → END
+// fastPath ─[hit]─────────────────────────────────────────────────→ outputCheck → END
+//      │
+//   [miss]
+//      ↓
+// classify → checkSentiment ─[escalate]→ END
+//                  │
+//              [continue]
+//                  ↓
+//             retrieve+rerank → generate → verify
+//                                    ↑       │
+//                                    └─[FAIL]┘
+//                                            │
+//                                          [PASS]
+//                                            ↓
+//                                       outputCheck → END
 const workflow = new StateGraph(AgentState)
+  .addNode('fastPath',       fastPath)
   .addNode('classify',       classify)
   .addNode('checkSentiment', checkSentiment)
   .addNode('retrieve',       retrieve)
   .addNode('generate',       generate)
   .addNode('verify',         verify)
   .addNode('outputCheck',    outputCheck)
-  .addEdge(START, 'classify')
+  .addEdge(START, 'fastPath')
+  // fastPath hit → straight to outputCheck (no retrieve / generate / verify).
+  // fastPath miss → normal classify path.
+  .addConditionalEdges('fastPath', (s: S) => s.fastPathHit ? 'outputCheck' : 'classify', {
+    classify:    'classify',
+    outputCheck: 'outputCheck',
+  })
   .addEdge('classify', 'checkSentiment')
   .addConditionalEdges('checkSentiment', (s: S) => s.escalate ? 'end' : 'retrieve', {
     end: END,
