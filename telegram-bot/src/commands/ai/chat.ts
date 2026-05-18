@@ -17,8 +17,6 @@ const LINK_LOOKUP: Array<{ keywords: string[]; url: string; label: string }> = [
     url: 'https://zeusnetwork.xyz', label: 'Zeus Network' },
   { keywords: ['eni website', 'eniac website', 'eni link', 'eniac link', 'eni url', 'eniac url', 'eniac web'],
     url: 'https://eniac.network', label: 'ENI / ENIAC' },
-  { keywords: ['ant.fun website', 'ant fun website', 'ant.fun link', 'ant fun link', 'ant.fun url', 'ant fun url', 'ant.fun site', 'ant fun site', 'antfun website', 'antfun link'],
-    url: 'https://ant.fun', label: 'ANT.FUN' },
   // ── Astarter official links
   { keywords: ['gitbook', 'docs', 'documentation', 'whitepaper', 'guide', 'wiki', 'manual'],
     url: 'https://astarter.gitbook.io/astarter', label: 'Gitbook / Docs' },

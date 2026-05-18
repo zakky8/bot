@@ -8,7 +8,7 @@ TENET is a moderation + AI assistant Telegram bot for the Astarter Web3 communit
 
 ## What it does
 
-- **AI assistant** — answers community questions about ABox nodes, AA tokenomics, MULAN points, partnerships (MULAN Labs, PayGo, Zeus, ENI/ENIAC, UXLINK, SumPlus, ANT.FUN — 7 active partners), roadmap, team, and developer resources.
+- **AI assistant** — answers community questions about ABox nodes, AA tokenomics, MULAN points, partnerships (MULAN, PayGo, Zeus, ENI/ENIAC, UXLINK), roadmap, team, and developer resources.
 - **Knowledge base** — local-JSON vector store powered by AWS Titan embeddings + hybrid cosine/keyword retrieval. Documents can be added live via `/adddoc` (text, URL, PDF, DOCX, TXT, MD, CSV, JSON).
 - **Moderation suite** — ban, kick, mute, warn, purge, federation, antiraid, captcha, flood control, blacklist, locks, welcome/goodbye automation, rules, notes, filters (100+ commands inherited from a Grammy moderation base).
 - **Smart routing** — every AI question is classified into an intent (`nodes`, `token`, `mulan`, `partnerships`, `roadmap`, `team`, `developers`, `links`, `project`, or `general`), then answered by an intent-specific expert prompt — never with a generic fallback when knowledge exists.
@@ -106,7 +106,7 @@ bot/
 │   ├── faq_data.json         ← legacy FAQ loaded into AIService prompt
 │   └── storage/vectors/      ← vector_db.json (runtime)
 ├── astarter-kb/              ← source-of-truth markdown KB
-│   └── partnerships.md       ← all 7 active partnerships
+│   └── partnerships.md       ← all 5 active partnerships
 ├── docs/
 │   ├── COMMANDS.md
 │   └── installation/         ← CLOUD.md, VPS.md, LOCALHOST.md
@@ -233,22 +233,6 @@ pm2 logs tenet-bot
 ```
 
 See [`docs/installation/CLOUD.md`](docs/installation/CLOUD.md) for the full GCP setup.
-
----
-
-## Active partnerships (7)
-
-| Partner | Type | Announced | Primary URL |
-|---|---|---|---|
-| **MULAN Labs** | Referral & traffic platform — MULAN points + AA airdrop eligibility | May 2026 | https://mulan.meme |
-| **PayGo** | AI-native x402 payment protocol — agent-to-agent payments | April 2026 | https://www.paygo.ac |
-| **Zeus Network** | Bitcoin liquidity — zBTC (1:1 BTC-pegged) cross-chain | April 2026 | https://zeusnetwork.xyz |
-| **ENI / ENIAC** | Enterprise modular L1 — cross-chain DeFi + co-incubation | April 2026 | https://eniac.network |
-| **UXLINK** | Web3 social platform — social growth + on-chain coordination | May 2026 | https://uxlink.io |
-| **SumPlus** | DeFi data layer via MCP — AI Agents data vision | May 2026 | https://www.sumplus.xyz |
-| **ANT.FUN** | Next-gen Social DEX — ultra-low-rate trading + AI tools | May 2026 | https://ant.fun |
-
-Full details in [`astarter-kb/partnerships.md`](astarter-kb/partnerships.md).
 
 ---
 
