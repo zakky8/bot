@@ -3,6 +3,7 @@ import { BotContext } from '../../types';
 import { aiService } from '../../core/ai';
 import { runAgent } from '../../ai/agent';
 import { lookupCachedResponse, writeCachedResponse } from '../../ai/responseCache';
+import { isAiBlocked } from '../../utils/aiBlocklist';
 
 // ── Deterministic link lookup — bypasses AI for simple link requests ──────────
 // Keyed by lowercase keywords. Matched before the AI is called, so the correct
@@ -494,6 +495,10 @@ export default (bot: Bot<BotContext>) => {
 
   // ── /ask — public question command (typed text only) ─────────────────────────
   bot.command('ask', async (ctx: BotContext) => {
+    // Silent ignore for blocked users — no acknowledgement, no engagement loop.
+    // Admins manage the blocklist via /blockai and /unblockai.
+    if (isAiBlocked(ctx.from?.id)) return;
+
     const typedText = (ctx.match as string)?.trim();
 
     // clear conversation history
@@ -517,6 +522,10 @@ export default (bot: Bot<BotContext>) => {
 
   // ── /ai — admin-only reply reader ────────────────────────────────────────────
   bot.command('ai', async (ctx: BotContext) => {
+    // Silent ignore for blocked users (would normally only matter if a blocked
+    // user is somehow an admin — but covers the edge case anyway).
+    if (isAiBlocked(ctx.from?.id)) return;
+
     // 1. Admin gate
     if (!await isAdminOrOwner(ctx)) {
       return ctx.reply('🔒 This command is for admins only.');

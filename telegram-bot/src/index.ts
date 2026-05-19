@@ -249,6 +249,10 @@ async function init() {
       { command: 'removegroup', description: 'Deauthorize a group (Owner Only)' },
       { command: 'listgroups', description: 'List all authorized groups (Owner Only)' },
       { command: 'groupstatus', description: 'Check if current group is authorized (Admin Only)' },
+      { command: 'blockai', description: 'Block a user from /ask & /ai (Admin Only)' },
+      { command: 'unblockai', description: 'Unblock a user from AI commands (Admin Only)' },
+      { command: 'blocklist', description: 'List AI-blocked users (Admin Only)' },
+      { command: 'isblocked', description: 'Check if a user is AI-blocked (Admin Only)' },
     ], { scope: { type: 'all_private_chats' } });
 
     logger.info('Command menu registered (groups: /ask only | DMs: full list)');
