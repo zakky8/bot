@@ -209,7 +209,7 @@ ANTHROPIC-STYLE REASONING PROTOCOL (highest priority — read first)
 ═══════════════════════════════════════════════════════════════
 
 THINKING FIRST (hidden from user):
-Before writing your answer, reason inside <thinking>...</thinking> tags. This block is stripped before the user sees anything. Use it like this:
+Before writing your answer, reason inside ONE <thinking>...</thinking> block. The block is stripped before the user sees anything. Use it exactly like this:
 <thinking>
 1. What is the user actually asking? (intent, not literal keywords)
 2. Which exact line in my KNOWLEDGE block or Retrieved Context answers this? Quote it verbatim.
@@ -217,7 +217,14 @@ Before writing your answer, reason inside <thinking>...</thinking> tags. This bl
 4. What part (if any) is unconfirmed? Be honest about gaps.
 5. What is the minimum response that fully answers? (1 sentence preferred)
 </thinking>
-Then output ONLY the final answer. No reasoning leaks into the user-facing reply.
+[Final answer here — ONE time only, no repeats]
+
+CRITICAL RULES for thinking + answer:
+• Use AT MOST ONE <thinking> block per response — never two, never nested.
+• After </thinking>, write your final answer EXACTLY ONCE and STOP.
+• Do NOT write the answer, then think again, then write the answer again.
+• Do NOT echo any part of your thinking in the final answer.
+• If you catch yourself about to write the answer twice — STOP after the first time.
 
 KNOWLEDGE BOUNDARY (external knowledge restriction):
 Your ONLY source of truth is the KNOWLEDGE block in your intent prompt + any Retrieved Context. Your model's general training data MUST be ignored for any Astarter-specific fact. If something isn't in your provided knowledge, it does not exist for you. Do NOT fill gaps from training, even if the answer "feels right." This is non-negotiable.
@@ -555,6 +562,29 @@ function outputCheck(state: S): Partial<S> {
   text = text.replace(/\s*\[\d+(?:\s*,\s*\d+)*\]/g, '').trim();
   // Collapse the double-spaces this might leave behind (" word  word" → " word word")
   text = text.replace(/  +/g, ' ');
+
+  // ── DEFENSIVE DEDUP ──────────────────────────────────────────────────────
+  // The model sometimes writes the same answer TWICE — most commonly when it
+  // emits multiple <thinking>...</thinking> blocks with answers between them,
+  // or when speculative RAG's scorer returns concat-y output. After stripping
+  // thinking + citations we're left with "AnswerX.AnswerX" or "AnswerX AnswerX".
+  //
+  // Detection strategy: if the first 40+ chars of the response appear again
+  // later in the response, that's a near-certain duplicate (real text almost
+  // never repeats its opening 40 characters verbatim). Truncate at the second
+  // occurrence.
+  {
+    const trimmed = text.trim();
+    if (trimmed.length > 80) {
+      const fp = trimmed.slice(0, 40);
+      const dupAt = trimmed.indexOf(fp, fp.length);
+      if (dupAt > 0) {
+        text = trimmed.slice(0, dupAt).trim();
+        // Also strip any trailing punctuation orphaned by the truncation
+        text = text.replace(/[.,;:\s]+$/, '');
+      }
+    }
+  }
 
   // Fix common model typos for project name
   text = text.replace(/Astaster/g, 'Astarter').replace(/astaster/g, 'astarter');
