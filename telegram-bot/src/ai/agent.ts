@@ -667,14 +667,35 @@ function outputCheck(state: S): Partial<S> {
     text = `I don't have confirmed details on that yet — check the announcements channel for the latest updates.`;
   }
 
+  // ── HISTORY POLLUTION GUARD ──────────────────────────────────────────────
+  // Fallback / timeout / error responses must NEVER enter conversation history.
+  // If they did, the next turn for the same user would include 'I'm having
+  // trouble right now' as context, making the model adopt that tone or
+  // reference the failure. Same poisoning pattern as response cache.
+  // (Must stay in sync with FALLBACK_PHRASES in responseCache.ts)
+  const FALLBACK_PATTERNS = [
+    /\bi'?m having trouble\b/i,
+    /\bi had trouble\b/i,
+    /\bcouldn'?t generate (a|that|the) (response|reply)\b/i,
+    /\bsomething went wrong\b/i,
+    /\bplease try again( shortly| in a moment)?\b/i,
+    /\bi'?m sorry,? but i can'?t help with that\b/i,
+    /\btry rephrasing it more simply\b/i,
+  ];
+  const isFallback = FALLBACK_PATTERNS.some(p => p.test(text));
+
   // Update conversation memory with the FINAL cleaned response only —
   // rejected drafts from a failed verify pass never reach history.
+  // If this turn was a fallback, write an EMPTY history update (the reducer
+  // does [...existing, ...update] so empty update = no change to history).
   return {
     response: text,
-    history: [
-      { role: 'user',      content: state.message },
-      { role: 'assistant', content: text },
-    ],
+    history: isFallback
+      ? [] // skip — don't poison future turns with this failure
+      : [
+          { role: 'user',      content: state.message },
+          { role: 'assistant', content: text },
+        ],
   };
 }
 

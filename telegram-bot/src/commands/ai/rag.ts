@@ -317,6 +317,18 @@ export default (bot: Bot<BotContext>) => {
       { parse_mode: 'HTML' }
     );
 
+    // ── DEDUP GUARD ──────────────────────────────────────────────────────
+    // Remove any existing faq_data.json entries BEFORE re-indexing. Without
+    // this, running /indexfaq twice produces 2x duplicate vectors per FAQ
+    // entry — cosine retrieval gets noisy and inconsistent.
+    // Makes the command idempotent — safe to re-run after editing faq_data.json.
+    try {
+      await aiService.removeDocumentBySource('faq_data.json');
+    } catch {
+      // best-effort — if remove fails, indexing still proceeds (worst case:
+      // some duplicates, but command still mostly works)
+    }
+
     let ok = 0; let fail = 0;
     for (const entry of faqEntries) {
       const text = `Q: ${entry.q}\nA: ${entry.a}`;
