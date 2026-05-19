@@ -34,9 +34,12 @@
 
 import { aiService } from '../core/ai';
 
-const NUM_DRAFTS = 3;
-const DRAFTER_TIMEOUT_MS = 18000;       // each drafter has 18s budget
-const SCORER_TIMEOUT_MS  = 6000;        // scorer is 8 tokens — fast
+const NUM_DRAFTS = 2;                   // 3→2 to reduce parallel Bedrock pressure (gpt-oss-120b
+                                         // throttles aggressively when 3+ concurrent calls fire
+                                         // alongside the verifier's parallel claim judges).
+const DRAFTER_TIMEOUT_MS = 14000;       // 18→14s — fail faster so the standard-generate fallback
+                                         // has headroom before the user's perceived timeout.
+const SCORER_TIMEOUT_MS  = 5000;        // scorer is 8 tokens — fast
 const DRAFTER_MAX_TOKENS = 768;          // smaller than standard 1024
 const SCORER_MAX_TOKENS  = 8;           // single letter only
 const MIN_CHUNKS_FOR_SPECULATIVE = 4;   // below this, partitioning is pointless

@@ -499,12 +499,19 @@ async function generate(state: S): Promise<Partial<S>> {
   // returns null, or throws. This is the SAFE PATH.
   if (response === null) {
     try {
+      // 28→40s — speculative can consume up to 14s before falling back here;
+      // standard generate needs enough headroom to actually complete on
+      // complex multi-part queries before the user perceives a timeout.
       const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('generate timeout')), 28000)
+        setTimeout(() => reject(new Error('generate timeout')), 40000)
       );
       response = await Promise.race([aiService.quickChat(system, userPrompt, 1024), timeout]);
-    } catch {
-      response = `I'm having trouble right now. Please check the announcements channel for the latest updates.`;
+    } catch (err) {
+      // Log to PM2 so we can see WHY generation failed (throttle? timeout? error?)
+      console.error('[generate fallback] LLM call failed:', err);
+      // Useful fallback — gives the user something actionable instead of a
+      // dead-end "trouble right now" that wastes their attempt.
+      response = `Sorry — I couldn't generate a response for that one. Try rephrasing it more simply, or open a ticket in the Astarter Discord for detailed support: https://discord.gg/XXDEjFPrgR`;
     }
   }
 
