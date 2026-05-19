@@ -67,6 +67,28 @@ function isCacheable(query: string, intent?: string): boolean {
   return true;
 }
 
+// ── Fallback / error response detection ───────────────────────────────────────
+// These phrases indicate the bot couldn't generate a real answer (timeout,
+// throttle, exception). Caching them is POISON — one user's failure becomes
+// every similar query's response for the next hour.
+//
+// Detected on BOTH write (prevent storage) AND read (evict + return cache miss
+// so the bot regenerates a real answer instead of serving stale failure).
+const FALLBACK_PHRASES: RegExp[] = [
+  /\bi'?m having trouble\b/i,
+  /\bi had trouble\b/i,
+  /\bcouldn'?t generate (a|that|the) response\b/i,
+  /\bcouldn'?t generate (a|that|the) reply\b/i,
+  /\bsomething went wrong\b/i,
+  /\bplease try again( shortly| in a moment)?\b/i,
+  /\bi'?m sorry,? but i can'?t help with that\b/i,
+  /\btry rephrasing it more simply\b/i,
+];
+
+function isFallbackResponse(response: string): boolean {
+  return FALLBACK_PHRASES.some(p => p.test(response));
+}
+
 /** Look up a cached response by semantic similarity. Returns null on miss. */
 export async function lookupCachedResponse(
   query: string,
@@ -106,6 +128,25 @@ export async function lookupCachedResponse(
   }
 
   if (best && best.score >= HIT_THRESHOLD) {
+    // Evict + reject if the cached response is a fallback/error message.
+    // One previous user's timeout poisoned the cache; serving it to a new
+    // user would propagate the failure. Drop the bad entry, force regenerate.
+    if (isFallbackResponse(best.entry.response)) {
+      // Find the cache ID that owns this entry and evict it
+      for (const key of keys) {
+        const raw = await r.get(ENTRY_PREFIX + key).catch(() => null);
+        if (!raw) continue;
+        try {
+          const e = JSON.parse(raw) as CacheEntry;
+          if (e.q === best.entry.q) {
+            r.del(ENTRY_PREFIX + key).catch(() => {});
+            r.srem(KEYS_SET, key).catch(() => {});
+            break;
+          }
+        } catch { /* skip */ }
+      }
+      return null; // force agent regeneration
+    }
     return {
       response: best.entry.response,
       intent:   best.entry.intent,
@@ -123,6 +164,10 @@ export async function writeCachedResponse(
 ): Promise<void> {
   if (!isCacheable(query, intent)) return;
   if (!response || response.length < 20) return; // skip dead-end fallbacks
+  // CRITICAL: never cache error/timeout fallback responses. Caching them
+  // poisons the cache — one user's failure becomes every similar query's
+  // response for the next TTL window. See FALLBACK_PHRASES above.
+  if (isFallbackResponse(response)) return;
 
   const embedding = await aiService.embedQuery(query);
   if (!embedding) return;
